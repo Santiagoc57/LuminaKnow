@@ -1,0 +1,53 @@
+{
+  "name": "lumina-video-library",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "scripts": {
+    "predev": "node scripts/ensure-native.mjs && node scripts/build-dark-css.mjs",
+    "dev": "next dev",
+    "prestart": "node scripts/ensure-native.mjs",
+    "build": "next build",
+    "start": "next start -H 0.0.0.0",
+    "pretest": "node scripts/ensure-native.mjs",
+    "test": "LUMINA_AI_RETRY_MS=0 LUMINA_BACKUP_DIR=$(mktemp -d) node --import tsx --test tests/*.test.ts",
+    "lint": "eslint . --ignore-pattern .next",
+    "backup": "node --import tsx scripts/backup.ts",
+    "restore": "node --import tsx scripts/restore.ts",
+    "extension:build": "node scripts/build-extension.mjs",
+    "extension:sign": "npm run extension:build && npx --yes web-ext@10.8.0 sign --channel=unlisted --source-dir extension/dist/firefox --artifacts-dir extension/signed",
+    "openclip:setup": "node scripts/setup-openclip.mjs",
+    "prebuild": "node scripts/build-dark-css.mjs"
+  },
+  "dependencies": {
+    "@google/genai": "^2.15.0",
+    "@huggingface/transformers": "^4.3.2",
+    "@mozilla/readability": "^0.6.0",
+    "bcryptjs": "^3.0.2",
+    "better-sqlite3": "^12.4.1",
+    "jsdom": "^29.1.1",
+    "lucide-react": "^0.468.0",
+    "next": "^16.3.0",
+    "openai": "^6.25.0",
+    "pdf-lib": "^1.17.1",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "react-force-graph-2d": "^1.29.1",
+    "sqlite-vec": "^0.1.7-alpha.2",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/jsdom": "^30.0.0",
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "eslint": "9.39.4",
+    "eslint-config-next": "^16.3.0",
+    "tsx": "^4.21.0",
+    "typescript": "5.9.3"
+  },
+  "type": "module"
+}

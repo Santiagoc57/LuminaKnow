@@ -1,0 +1,9 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lúmina</title><link rel="stylesheet" href="popup.css"></head><body><main>
+  <header><span class="mark"><i></i></span><div><strong>Lúmina</strong><small>Companion</small></div><button id="options" title="Ajustes">⚙</button></header>
+  <section id="loading" class="state">Leyendo la página…</section>
+  <section id="setup" class="state hidden"><strong>Vincula esta extensión</strong><p>Genera el código desde Ajustes → Extensión en Lúmina y pégalo en las opciones.</p><button id="open-options" class="primary">Abrir ajustes</button></section>
+  <section id="capture" class="hidden"><p class="site" id="site"></p><h1 id="title"></h1><div id="tags" class="tags"></div><p id="hint" class="hint hidden"></p><div class="actions"><button id="save" class="primary">Guardar</button></div><p id="message" class="message"></p></section>
+  <section id="note-box" class="note-box hidden"><textarea id="note" rows="3" placeholder="Añade una nota…"></textarea><button id="save-note" type="button">Guardar nota</button></section>
+  <section id="related" class="related hidden"><div class="section-title"><strong>Relacionado en tu biblioteca</strong><span id="related-count"></span></div><div id="related-list"></div></section>
+  <footer><button id="open-lumina">Abrir Lúmina</button><span id="shortcut">Alt+S guarda al instante</span></footer>
+</main><script src="common.js"></script><script src="page-readers.js"></script><script src="popup.js"></script></body></html>

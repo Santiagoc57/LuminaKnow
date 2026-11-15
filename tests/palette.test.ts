@@ -1,0 +1,32 @@
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import test from "node:test";
+
+test("una imagen con colores se convierte en tarjeta de paleta buscable por color", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "lumina-palette-"));
+  process.env.LUMINA_DATA_DIR = directory;
+  global.__luminaDb = undefined;
+  const { getDb } = await import(`../lib/db?palette=${Date.now()}`);
+  const { createPaletteFromImage } = await import(`../lib/palette?palette=${Date.now()}`);
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.prepare("INSERT INTO profiles(id, name, pin_hash, avatar_color, created_at) VALUES('p', 'S', 'x', '#000', ?)").run(now);
+  db.prepare("INSERT INTO videos(id, youtube_id, source_type, url, title, thumbnail_url, status, added_by, created_at, updated_at) VALUES('img', 'h', 'image', 'local://imagen/img', 'Atardecer', '/api/media/img.png', 'ready', 'p', ?, ?)").run(now, now);
+  assert.throws(() => createPaletteFromImage("img", "p"), /colores/);
+  db.prepare("INSERT INTO visual_analysis(video_id, text, labels_json, colors_json, width, height, analyzed_at) VALUES('img', '', '[]', ?, 10, 10, ?)").run(JSON.stringify([{ hex: "#e2483d", share: 0.5 }, { hex: "#3d7fd9", share: 0.3 }]), now);
+  const palette = createPaletteFromImage("img", "p");
+  assert.equal(palette.duplicate, false);
+  assert.equal(createPaletteFromImage("img", "p").id, palette.id);
+  const row = db.prepare("SELECT source_type AS type, description FROM videos WHERE id = ?").get(palette.id) as { type: string; description: string };
+  assert.equal(row.type, "palette");
+  assert.match(row.description, /rojo/);
+  const { listVideos } = await import(`../lib/data?palette=${Date.now()}`);
+  const { matchesLibraryQuery, parseLibraryQuery } = await import(`../lib/library-query?palette=${Date.now()}`);
+  const video = listVideos("").find((item: { id: string }) => item.id === palette.id);
+  assert.ok(video);
+  assert.equal(matchesLibraryQuery(video, parseLibraryQuery("tipo:paleta color:azul"), []), true);
+  db.close(); global.__luminaDb = undefined;
+  await fs.rm(directory, { recursive: true, force: true });
+});

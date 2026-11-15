@@ -1,0 +1,31 @@
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import test from "node:test";
+
+test("la extensión lista carpetas, crea una y guarda dentro", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "lumina-boards-"));
+  process.env.LUMINA_DATA_DIR = directory;
+  global.__luminaDb = undefined;
+  const { getDb } = await import(`../lib/db?boards=${Date.now()}`);
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.prepare("INSERT INTO profiles(id, name, pin_hash, avatar_color, created_at) VALUES('p', 'S', 'x', '#000', ?)").run(now);
+  db.prepare("INSERT INTO videos(id, youtube_id, source_type, url, title, thumbnail_url, status, added_by, created_at, updated_at) VALUES('v', 'v', 'image', 'local://imagen/v', 'Foto', '/api/media/v.png', 'ready', 'p', ?, ?)").run(now, now);
+  const { createExtensionToken } = await import(`../lib/extension-auth?boards=${Date.now()}`);
+  const token = createExtensionToken("p");
+  const boards = await import(`../app/api/extension/boards/route?boards=${Date.now()}`);
+  const collect = await import(`../app/api/extension/collect/route?boards=${Date.now()}`);
+  const call = (handler: (request: Request) => Promise<Response>, method: string, body?: unknown) => handler(new Request("http://localhost:3000/x", { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined }));
+  const created = await (await call(boards.POST, "POST", { name: "Animalitos" })).json() as { id: string };
+  assert.ok(created.id);
+  assert.equal((await (await call(boards.POST, "POST", { name: "animalitos" })).json() as { id: string }).id, created.id);
+  const saved = await call(collect.POST, "POST", { id: "v", collectionId: created.id });
+  assert.equal(((await saved.json()) as { board: string }).board, "Animalitos");
+  const list = await (await call(boards.GET, "GET")).json() as { boards: Array<{ id: string; count: number; cover: string }> };
+  assert.equal(list.boards[0].count, 1);
+  assert.equal(list.boards[0].cover, "/api/media/v.png");
+  db.close(); global.__luminaDb = undefined;
+  await fs.rm(directory, { recursive: true, force: true });
+});

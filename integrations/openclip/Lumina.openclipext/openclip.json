@@ -1,0 +1,22 @@
+{
+  "identifier": "local.lumina.save",
+  "name": "Lúmina",
+  "description": "Guarda el texto seleccionado en tu biblioteca de Lúmina.",
+  "version": "1.0.0",
+  "releaseNotes": "Primera versión.",
+  "capabilities": [],
+  "actions": [
+    {
+      "id": "save",
+      "title": "Guardar en Lúmina",
+      "icon": "icon.svg",
+      "type": "script",
+      "script": "save.sh",
+      "output": "none",
+      "loading": true,
+      "loadingMessage": "Guardando en Lúmina…",
+      "toast": { "message": "Guardado en Lúmina", "style": "success" },
+      "requirements": { "input": "text" }
+    }
+  ]
+}

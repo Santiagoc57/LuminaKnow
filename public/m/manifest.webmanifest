@@ -1,0 +1,28 @@
+{
+  "name": "LUMINA",
+  "short_name": "LUMINA",
+  "description": "Guarda en LUMINA lo que compartes desde el celular.",
+  "id": "/m/",
+  "start_url": "/m/index.html",
+  "scope": "/m/",
+  "display": "standalone",
+  "background_color": "#f8f6f1",
+  "theme_color": "#f8f6f1",
+  "lang": "es",
+  "icons": [
+    { "src": "/m/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/m/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/m/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "share_target": {
+    "action": "/m/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [{ "name": "files", "accept": ["image/*"] }]
+    }
+  }
+}
