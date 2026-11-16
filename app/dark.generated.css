@@ -923,6 +923,9 @@ html[data-theme="dark"] .lv-serendipity-quick button { background: hsl(218 6% 17
 html[data-theme="dark"] .lv-serendipity-quick button:hover { background: hsl(216 6% 15%); }
 html[data-theme="dark"] .lv-serendipity-note .lv-note-mic { color: hsl(39 6% 71%); }
 html[data-theme="dark"] .lv-serendipity-note .lv-note-mic:hover { background: hsl(43 4% 16%); color: hsl(30 3% 85%); }
+html[data-theme="dark"] .week-themes button { background: hsl(43 3% 16%); color: hsl(40 2% 84%); }
+html[data-theme="dark"] .week-themes button b { color: hsl(39 6% 71%); }
+html[data-theme="dark"] .week-themes button:hover { background: hsl(40 4% 13%); }
 
 /* «ESC para cerrar» va sobre el fondo oscuro del modal: blanco también en modo oscuro. */
 html[data-theme="dark"] .lv-modal-esc { color: rgba(255,255,255,.82); }

@@ -4,9 +4,9 @@ import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Archive,
+  CalendarDays,
   ArrowUpRight,
   Bookmark,
-  BookOpen,
   Check,
   ChevronDown,
   CircleAlert,
@@ -17,18 +17,13 @@ import {
   Folder,
   GraduationCap,
   Github,
-  GitBranch,
   Globe2,
   Hash,
   House,
   ImageIcon,
-  Layers,
   Eye,
   Library,
-  Languages,
-  Lightbulb,
   Link2,
-  ListChecks,
   LoaderCircle,
   LogOut,
   Menu,
@@ -44,30 +39,26 @@ import {
   Puzzle,
   Smartphone,
   RefreshCw,
-  RotateCcw,
   Search,
   Settings,
   Moon,
-  Shuffle,
   Sun,
   WandSparkles,
   Sparkles,
-  Tag,
   Trash2,
   X,
 } from "lucide-react";
 import type { AppVideo, AvailableModel, ChatSourceSelection, Citation, ConversationSummary, LibraryCollection, LibraryTag, SmartSpace } from "@/lib/types";
 import { canSelectCatalogTag, matchingCatalogTags } from "@/lib/tag-picker";
-import { formatTimestamp, parseRedditUrl, parseSourceUrl, parseXUrl } from "@/lib/utils";
+import { parseRedditUrl, parseSourceUrl, parseXUrl } from "@/lib/utils";
 import { matchesLibraryQuery, parseLibraryQuery } from "@/lib/library-query";
 import { isProvisionalSummary } from "@/lib/summary";
-import { BulkTaggingModal, CollectionWorkspace, GraphWorkspace, KnowledgeHome } from "./ConnectedWorkspaces";
+import { BulkTaggingModal, GraphWorkspace, KnowledgeHome } from "./ConnectedWorkspaces";
 import { DailyReview } from "./ReviewViews";
 import { DetailModal, SerendipityWorkspace, SpacesWorkspace, spaceVideos } from "./DiscoverViews";
 import { UnifiedChatWorkspace } from "./UnifiedChat";
 
 type Profile = { id: string; name: string; avatarColor: string };
-type Taxonomy = { id: string; name: string; color: string; description?: string; updatedAt?: string; level?: LibraryTag["level"] };
 type Bootstrap = {
   aiLastError?: string;
   profile: Profile;
@@ -88,21 +79,10 @@ type AppSurface = "home" | "ask" | "video" | "collection" | "graph" | "chat" | "
 type TranscriptChunk = { id: number; ordinal: number; startSeconds: number; endSeconds: number; text: string };
 type ChatMessage = { id?: string; role: "user" | "assistant"; content: string; citations?: Citation[]; pending?: boolean };
 type Detail = { video: AppVideo; transcript: TranscriptChunk[]; messages: ChatMessage[] };
-type WorkspaceTab = "notebook" | "reader" | "quiz" | "connections" | "graph";
 type LibraryScope = "all" | "notes" | "pdfs" | "youtube" | "images" | "social" | "article" | "github" | "web" | "unsorted" | "archived" | null;
 
-function sourceHref(video: AppVideo, startSeconds?: number | null) {
-  if (video.sourceType !== "youtube" || startSeconds == null) return video.url;
-  return `${video.url}${video.url.includes("?") ? "&" : "?"}t=${Math.floor(startSeconds)}s`;
-}
 
-function sourceLabel(sourceType: AppVideo["sourceType"]) {
-  return sourceType === "x" ? "X" : sourceType === "reddit" ? "Reddit" : sourceType === "web" ? "la página original" : sourceType === "image" ? "la imagen" : sourceType === "note" ? "la nota" : sourceType === "pdf" ? "el documento" : "YouTube";
-}
 
-function socialSourceMark(sourceType: AppVideo["sourceType"]) {
-  return sourceType === "x" ? "𝕏" : sourceType === "reddit" ? "r/" : sourceType === "web" ? "Aa" : null;
-}
 
 function sourceVisual(video: AppVideo) {
   if (video.sourceType !== "web") return video.sourceType;
@@ -132,9 +112,6 @@ function isGithubVideo(video: AppVideo) {
   } catch { return false; }
 }
 
-function opensInsideLumina(video: AppVideo) {
-  return video.sourceType === "youtube" || isSubstackVideo(video);
-}
 
 function sourceDateLabel(value: string) {
   if (!value) return "";
@@ -293,20 +270,6 @@ function LoginScreen({ profiles, onLogin }: { profiles: Profile[]; onLogin: (pro
   );
 }
 
-function StatusPill({ status }: { status: AppVideo["status"] }) {
-  const labels: Record<AppVideo["status"], string> = {
-    saved: "Guardado",
-    queued: "En cola",
-    extracting: "Extrayendo",
-    indexing: "Organizando",
-    summarizing: "Resumiendo",
-    ready: "Listo",
-    needs_transcript: "Sin subtítulos",
-    failed: "Con error",
-  };
-  const busy = ["queued", "extracting", "indexing", "summarizing"].includes(status);
-  return <span className={`status status-${status}`}>{busy && <LoaderCircle className="spin" size={12} />}{labels[status]}</span>;
-}
 
 function AddVideoModal({ tags, onClose, onAdded }: { tags: LibraryTag[]; onClose: () => void; onAdded: (id: string) => void }) {
   const [url, setUrl] = useState("");
@@ -461,31 +424,6 @@ function AddVideoModal({ tags, onClose, onAdded }: { tags: LibraryTag[]; onClose
   );
 }
 
-function EditVideoTitleModal({ video, onClose, onSaved }: { video: AppVideo; onClose: () => void; onSaved: () => Promise<void> }) {
-  const [title, setTitle] = useState(video.title);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    if (!title.trim()) return;
-    setSaving(true);
-    setError("");
-    try {
-      await jsonRequest(`/api/videos/${video.id}`, { method: "PATCH", body: JSON.stringify({ title: title.trim() }) });
-      await onSaved();
-      onClose();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "No se pudo cambiar el título.");
-    } finally { setSaving(false); }
-  }
-  return <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-    <section className="modal-card rename-video-modal">
-      <button className="icon-button modal-close" onClick={onClose} aria-label="Cerrar"><X size={18} /></button>
-      <p className="eyebrow">Video guardado</p><h2>Cambiar título</h2><p>Este nombre solo cambia dentro de Lúmina. El título original de YouTube permanece intacto.</p>
-      <form onSubmit={submit}><label>Título<input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={200} autoFocus /></label>{error && <p className="form-error"><CircleAlert size={16} />{error}</p>}<button className="primary-button wide" disabled={saving || !title.trim()}>{saving ? <LoaderCircle className="spin" size={17} /> : <Check size={17} />} Guardar título</button></form>
-    </section>
-  </div>;
-}
 
 function SettingsModal({ bootstrap, onClose, onSaved }: { bootstrap: Bootstrap; onClose: () => void; onSaved: () => void }) {
   const [geminiKey, setGeminiKey] = useState("");
@@ -845,6 +783,29 @@ function AiIssuesPanel({ videos, lastError, onOpen, onRetried }: { videos: AppVi
   </div>;
 }
 
+// «Tu semana»: un resumen local (sin IA, sin costo) de lo que guardaste y de lo que conviene retomar.
+function WeekPanel({ videos, onOpen, onSearch }: { videos: AppVideo[]; onOpen: (id: string) => void; onSearch: (query: string) => void }) {
+  const [now] = useState(() => Date.now());
+  const day = 86_400_000;
+  const saved = videos.filter((video) => now - new Date(video.createdAt).getTime() < 7 * day);
+  const consumed = videos.filter((video) => video.consumedAt && now - new Date(video.consumedAt).getTime() < 7 * day);
+  const counts = new Map<string, number>();
+  saved.forEach((video) => video.tags.forEach((tag) => counts.set(tag.name, (counts.get(tag.name) ?? 0) + 1)));
+  const themes = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
+  // Lo guardado hace un año (± 2 semanas) y lo pendiente de hace más de 2 semanas, para retomarlo.
+  const yearAgo = videos.filter((video) => Math.abs(now - new Date(video.createdAt).getTime() - 365 * day) < 14 * day).slice(0, 2);
+  const pending = videos.filter((video) => !video.consumedAt && now - new Date(video.createdAt).getTime() > 14 * day && video.sourceType !== "note" && video.sourceType !== "image" && video.sourceType !== "palette")
+    .slice(0, 3);
+  const row = (video: AppVideo, note: string) => <li key={video.id}><button onClick={() => onOpen(video.id)}><span className="rail-list-thumb" style={video.thumbnailUrl ? { backgroundImage: `url(${video.thumbnailUrl})` } : undefined} /><span><strong>{video.title}</strong><small>{note}</small></span></button></li>;
+  return <div className="rail-list week-panel">
+    <header><strong>Tu semana</strong><small>{saved.length === 1 ? "Guardaste 1 cosa" : `Guardaste ${saved.length} cosas`}{consumed.length ? ` y terminaste ${consumed.length}` : ""} en los últimos 7 días.</small></header>
+    {themes.length > 0 && <div className="week-themes">{themes.map(([name, count]) => <button key={name} onClick={() => onSearch(`#${name.replace(/\s+/g, "-")}`)}>{name}<b>{count}</b></button>)}</div>}
+    {yearAgo.length > 0 && <><h4>Hace un año</h4><ul>{yearAgo.map((video) => row(video, new Date(video.createdAt).toLocaleDateString("es", { day: "numeric", month: "long", year: "numeric" })))}</ul></>}
+    {pending.length > 0 && <><h4>Para retomar</h4><ul>{pending.map((video) => row(video, `Guardado ${new Date(video.createdAt).toLocaleDateString("es", { day: "numeric", month: "short" })} · sin ver`))}</ul></>}
+    {!saved.length && !yearAgo.length && !pending.length && <p className="rail-list-empty">Esta semana ha estado tranquila.</p>}
+  </div>;
+}
+
 // «En mente»: lo que fijaste con el alfiler, como una carpeta temporal siempre a mano.
 function ShelfPanel({ videos, onOpen }: { videos: AppVideo[]; onOpen: (id: string) => void }) {
   return <div className="rail-list">
@@ -925,457 +886,17 @@ function CanonicalTagNavigation({ data, selectedIds, open, onToggleOpen, onChang
   </section>;
 }
 
-function Sidebar({ data, selectedId, activeCollection, selectedTagIds, todoActive, activeSpaceId, spacesActive, onOpenSpace, onSpaces, onSerendipity, onReview, onSelect, onSearch, onCollection, onTodo, onTagIds, onMigrateTags, onSettings, onLogout, onRefresh }: {
-  data: Bootstrap;
-  activeSpaceId: string | null;
-  spacesActive: boolean;
-  onOpenSpace: (id: string) => void;
-  onSpaces: () => void;
-  onSerendipity: () => void;
-  onReview: () => void;
-  selectedId: string | null;
-  activeCollection: string | null;
-  selectedTagIds: string[];
-  todoActive: boolean;
-  onSelect: (id: string) => void;
-  onSearch: (value: string) => void;
-  onCollection: (id: string | null) => void;
-  onTodo: () => void;
-  onTagIds: (ids: string[]) => void;
-  onMigrateTags: () => void;
-  onSettings: () => void;
-  onLogout: () => void;
-  onRefresh: () => Promise<void>;
-}) {
-  const [search, setSearch] = useState("");
-  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
-  const [tagsOpen, setTagsOpen] = useState(() => typeof window === "undefined" ? true : window.localStorage.getItem(`lumina-tags-section-${data.profile.id}`) !== "closed");
-  const [foldersOpen, setFoldersOpen] = useState(() => typeof window === "undefined" ? false : window.localStorage.getItem(`lumina-folders-section-${data.profile.id}`) === "open");
-  const [expanded, setExpanded] = useState<string[]>(() => {
-    if (typeof window === "undefined") return data.collections.filter((item) => !item.parentId).map((item) => item.id);
-    try {
-      const saved = JSON.parse(window.localStorage.getItem(`lumina-expanded-folders-${data.profile.id}`) || "null") as string[] | null;
-      return saved || data.collections.filter((item) => !item.parentId).map((item) => item.id);
-    } catch { return data.collections.filter((item) => !item.parentId).map((item) => item.id); }
-  });
-  const query = search.trim().toLocaleLowerCase("es");
-  const childrenOf = (parentId: string | null) => data.collections.filter((item) => item.parentId === parentId).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "es"));
-  const descendantIds = (id: string) => {
-    const ids = new Set<string>([id]);
-    let changed = true;
-    while (changed) { changed = false; data.collections.forEach((item) => { if (item.parentId && ids.has(item.parentId) && !ids.has(item.id)) { ids.add(item.id); changed = true; } }); }
-    return ids;
-  };
-  const videosFor = (id: string, recursive = false) => {
-    const ids = recursive ? descendantIds(id) : new Set([id]);
-    return data.videos.filter((video) => video.collections.some((item) => ids.has(item.id)));
-  };
-  const matchesBranch = (collection: LibraryCollection): boolean => {
-    if (!query) return true;
-    if (collection.name.toLocaleLowerCase("es").includes(query)) return true;
-    if (videosFor(collection.id, true).some((video) => `${video.title} ${video.channel}`.toLocaleLowerCase("es").includes(query))) return true;
-    return childrenOf(collection.id).some(matchesBranch);
-  };
-  const toggleExpanded = (id: string) => setExpanded((current) => {
-    const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
-    window.localStorage.setItem(`lumina-expanded-folders-${data.profile.id}`, JSON.stringify(next));
-    return next;
-  });
-  const createFolder = async (parentId: string | null = null) => {
-    const name = window.prompt(parentId ? "Nombre de la subcarpeta" : "Nombre de la carpeta");
-    if (!name?.trim()) return;
-    await jsonRequest("/api/collections", { method: "POST", body: JSON.stringify({ name: name.trim(), parentId }) });
-    if (parentId && !expanded.includes(parentId)) toggleExpanded(parentId);
-    await onRefresh();
-  };
-  const addSourceToFolder = async (videoId: string, collectionId: string) => {
-    const video = data.videos.find((item) => item.id === videoId);
-    if (!video || video.collections.some((item) => item.id === collectionId)) return;
-    await jsonRequest(`/api/videos/${videoId}/collections`, { method: "PUT", body: JSON.stringify({ collectionIds: [...video.collections.map((item) => item.id), collectionId] }) });
-    await onRefresh();
-  };
-  const renderCollection = (collection: LibraryCollection, depth = 0): React.ReactNode => {
-    const children = childrenOf(collection.id).filter(matchesBranch);
-    const directVideos = videosFor(collection.id).filter((video) => !query || `${video.title} ${video.channel}`.toLocaleLowerCase("es").includes(query));
-    const open = query ? true : expanded.includes(collection.id);
-    return <div className="collection-tree-branch" key={collection.id} style={{ "--folder-depth": depth } as React.CSSProperties}>
-      <div className={`collection-tree-row ${activeCollection === collection.id ? "active" : ""} ${dropTargetId === collection.id ? "drop-target" : ""}`} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setDropTargetId(collection.id); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTargetId(null); }} onDrop={(event) => { event.preventDefault(); const videoId = event.dataTransfer.getData("application/x-lumina-source") || event.dataTransfer.getData("text/plain"); setDropTargetId(null); if (videoId) void addSourceToFolder(videoId, collection.id); }}>
-        <button className="folder-disclosure" onClick={() => toggleExpanded(collection.id)} aria-label={open ? "Contraer carpeta" : "Expandir carpeta"}>{children.length || directVideos.length ? <ChevronDown size={14} className={open ? "" : "collapsed"} /> : <span />}</button>
-        <button className="folder-open" onClick={() => onCollection(collection.id)}><Folder size={15} style={{ color: collection.color }} /><strong>{collection.name}</strong></button>
-        <span>{videosFor(collection.id, true).length}</span>
-        <button className="folder-add-child" onClick={() => void createFolder(collection.id)} title="Crear subcarpeta" aria-label={`Crear subcarpeta dentro de ${collection.name}`}><Plus size={13} /></button>
-      </div>
-      {open && <div className="collection-tree-children">
-        {children.map((child) => renderCollection(child, depth + 1))}
-        {directVideos.map((video) => <button draggable key={video.id} className={`collection-tree-video ${selectedId === video.id ? "active" : ""}`} style={{ "--folder-depth": depth + 1 } as React.CSSProperties} onDragStart={(event) => { event.dataTransfer.effectAllowed = "copyMove"; event.dataTransfer.setData("application/x-lumina-source", video.id); event.dataTransfer.setData("text/plain", video.id); }} onClick={() => opensInsideLumina(video) ? onSelect(video.id) : window.open(video.url, "_blank", "noopener,noreferrer")}>
-          <span><strong>{video.title}</strong><small>{video.channel || (video.status === "saved" ? "Enlace guardado" : "Analizando…")}</small></span>
-          {video.status !== "ready" && <i className={`status-dot dot-${video.status}`} />}
-        </button>)}
-      </div>}
-    </div>;
-  };
-  const roots = childrenOf(null).filter(matchesBranch);
-  const toggleTagsSection = () => setTagsOpen((current) => { const next = !current; window.localStorage.setItem(`lumina-tags-section-${data.profile.id}`, next ? "open" : "closed"); return next; });
-  const toggleFoldersSection = () => setFoldersOpen((current) => { const next = !current; window.localStorage.setItem(`lumina-folders-section-${data.profile.id}`, next ? "open" : "closed"); return next; });
-  return (
-    <aside className="sidebar">
-      <div className="sidebar-head">
-        <div className="sidebar-brand-row"><span className="sidebar-wordmark">Lúmina</span></div>
-        <div className="search-field"><Search size={16} /><input value={search} onChange={(event) => { setSearch(event.target.value); onSearch(event.target.value); }} placeholder="Buscar en tu biblioteca" /><kbd>⌘ K</kbd></div>
-      </div>
-      <nav className="collection-tree" aria-label="Carpetas">
-        <button className={`sidebar-todo ${todoActive && !activeCollection && selectedTagIds.length === 0 ? "active" : ""}`} onClick={onTodo}><span>TODO</span><small>{data.videos.length}</small></button>
-        <div className="sidebar-discover">
-          <button onClick={onReview}><GraduationCap size={15} /> Revisión diaria</button>
-          <button className={spacesActive ? "active" : ""} onClick={onSpaces}><Layers size={15} /> Espacios<small>{data.spaces.length}</small></button>
-          {data.spaces.length > 0 && <div className="sidebar-space-list">{data.spaces.map((space) => <button key={space.id} className={`sidebar-space ${activeSpaceId === space.id ? "active" : ""}`} onClick={() => onOpenSpace(space.id)}><i style={{ borderColor: space.color }} /><span>{space.name}</span><small>{spaceVideos(space, data.videos, data.tags).length}</small></button>)}</div>}
-        </div>
-        <CanonicalTagNavigation data={data} selectedIds={selectedTagIds} open={tagsOpen} onToggleOpen={toggleTagsSection} onChange={onTagIds} onMigrate={onMigrateTags} />
-        <section className={`folder-navigation taxonomy-collapsible ${foldersOpen ? "open" : ""}`}>
-          <header><button className="taxonomy-section-toggle" onClick={toggleFoldersSection} aria-expanded={foldersOpen}><ChevronDown size={15} /><Folder size={14} /><strong>Carpetas</strong></button><button onClick={() => void createFolder()} title="Nueva carpeta" aria-label="Crear carpeta"><Plus size={14} /></button></header>
-          {foldersOpen && <div className="collection-tree-scroll">{roots.map((collection) => renderCollection(collection))}{!roots.length && <span className="empty-taxonomy">{query ? "No encontramos una carpeta" : "Aún no hay carpetas"}</span>}</div>}
-        </section>
-      </nav>
-      <div className="sidebar-foot">
-        <div className="budget-meter"><div><span>Uso de IA</span><strong>{Math.min(100, data.usage.cost / data.usage.budget * 100).toFixed(0)}%</strong></div><span><i style={{ width: `${Math.min(100, data.usage.cost / data.usage.budget * 100)}%` }} /></span></div>
-        <button className="profile-button" onClick={onSettings}><Avatar profile={data.profile} small /><span><strong>{data.profile.name}</strong><small>Biblioteca compartida</small></span><Settings size={16} /></button>
-        <button className="logout-button" onClick={onLogout}><LogOut size={15} /> Cambiar perfil</button>
-      </div>
-    </aside>
-  );
-}
 
-function TaxonomyPicker({ title, items, selectedIds, icon, onChange, onCreate }: {
-  title: string;
-  items: Taxonomy[];
-  selectedIds: string[];
-  icon: React.ReactNode;
-  onChange: (ids: string[]) => void;
-  onCreate?: (name: string) => Promise<Taxonomy>;
-}) {
-  const [name, setName] = useState("");
-  return (
-    <details className="taxonomy-picker">
-      <summary>{icon}{title}<ChevronDown size={13} /></summary>
-      <div className="taxonomy-menu">
-        {items.map((item) => { const checked = selectedIds.includes(item.id); const selectedAtLevel = item.level ? items.filter((candidate) => candidate.level === item.level && selectedIds.includes(candidate.id)).length : 0; const disabled = !checked && (item.level === "primary" ? selectedAtLevel >= 3 : item.level === "secondary" ? selectedAtLevel >= 2 : false); return <label key={item.id} className={disabled ? "disabled" : ""}><input type="checkbox" checked={checked} disabled={disabled} onChange={() => onChange(checked ? selectedIds.filter((id) => id !== item.id) : [...selectedIds, item.id])} /><span className="tag-dot" style={{ background: item.color }} />{item.name}</label>; })}
-        {onCreate && <form onSubmit={async (event) => { event.preventDefault(); if (!name.trim()) return; const created = await onCreate(name); setName(""); onChange([...selectedIds, created.id]); }}>
-          <input value={name} onChange={(event) => setName(event.target.value)} placeholder={`Nueva ${title.toLowerCase()}`} />
-          <button aria-label="Crear"><Plus size={15} /></button>
-        </form>}
-      </div>
-    </details>
-  );
-}
 
-function EmptyWorkspace({ onAdd }: { onAdd: () => void }) {
-  return (
-    <main className="empty-workspace">
-      <div className="empty-orbit"><span /><span /><span /><Sparkles size={26} /></div>
-      <p className="eyebrow">Tu segundo cerebro empieza aquí</p>
-      <h1>Una biblioteca para las ideas que sí importan.</h1>
-      <p>Guarda tu primera fuente y conviértela en un resumen claro y una conversación que siempre cita el contenido original.</p>
-      <button className="primary-button" onClick={onAdd}><Plus size={18} /> Guardar mi primera fuente</button>
-      <div className="empty-steps"><span><b>1</b>Pega un enlace</span><i /><span><b>2</b>La IA lo comprende</span><i /><span><b>3</b>Vuelve a sus ideas</span></div>
-    </main>
-  );
-}
 
-function VideoWorkspace({ detail, data, onRefresh, onSelectVideo, onStartChat, chatOpen }: {
-  detail: Detail;
-  data: Bootstrap;
-  onRefresh: () => Promise<void>;
-  onSelectVideo: (id: string | null) => void;
-  onStartChat: () => void;
-  chatOpen: boolean;
-}) {
-  const [tab, setTab] = useState<WorkspaceTab>("notebook");
-  const [note, setNote] = useState(detail.video.note?.content || "");
-  const [savingNote, setSavingNote] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [editTitleOpen, setEditTitleOpen] = useState(false);
-  const video = detail.video;
-  const isTweet = video.sourceType === "x";
 
-  async function saveNote() {
-    setSavingNote(true);
-    await jsonRequest(`/api/videos/${video.id}/note`, { method: "PUT", body: JSON.stringify({ content: note }) });
-    await onRefresh();
-    setSavingNote(false);
-  }
-  async function updateTaxonomy(kind: "tags" | "collections", ids: string[]) {
-    const key = kind === "tags" ? "tagIds" : "collectionIds";
-    await jsonRequest(`/api/videos/${video.id}/${kind}`, { method: "PUT", body: JSON.stringify({ [key]: ids }) });
-    await onRefresh();
-  }
-  async function createTaxonomy(kind: "tags" | "collections", name: string) {
-    const created = await jsonRequest<Taxonomy>(`/api/${kind}`, { method: "POST", body: JSON.stringify({ name }) });
-    await onRefresh();
-    return created;
-  }
-  async function retry() {
-    await jsonRequest(`/api/videos/${video.id}`, { method: "PATCH", body: JSON.stringify({ action: "retry" }) });
-    await onRefresh();
-  }
-  async function transcribe() {
-    const minutes = Math.max(1, Math.ceil(video.durationSeconds / 60));
-    const estimate = data.aiProvider === "gemini" ? "US$0 dentro del nivel gratuito" : `aproximadamente US$${(minutes * 0.006).toFixed(2)}`;
-    if (!window.confirm(`La transcripción usará audio temporal durante unos ${minutes} min y costará ${estimate}. ¿Continuar?`)) return;
-    await jsonRequest(`/api/videos/${video.id}/transcribe-audio`, { method: "POST" });
-    await onRefresh();
-  }
-  async function remove() {
-    if (!window.confirm("¿Eliminar esta fuente y toda su información local?")) return;
-    await jsonRequest(`/api/videos/${video.id}`, { method: "DELETE" });
-    onSelectVideo(null);
-    await onRefresh();
-  }
 
-  return (
-    <main className="content-panel">
-      <header className="video-header">
-        <div className={`hero-thumb ${video.sourceType !== "youtube" ? "x-source-thumb" : ""}`} style={video.thumbnailUrl ? { backgroundImage: `url(${video.thumbnailUrl})` } : undefined}><a href={video.url} target="_blank" rel="noreferrer" aria-label={`Abrir en ${sourceLabel(video.sourceType)}`}>{video.sourceType !== "youtube" && !video.thumbnailUrl ? <strong>{socialSourceMark(video.sourceType)}</strong> : <Play size={22} fill="currentColor" />}</a></div>
-        <div className="video-heading">
-          <div className="video-heading-top"><StatusPill status={video.status} /><span>Agregado por {video.addedByName}</span></div>
-          <h1>{video.title}</h1>
-          <p>{video.channel || (video.status === "saved" ? "Enlace guardado para después" : "Obteniendo datos de la fuente…")}{video.sourceType === "youtube" && video.durationSeconds ? ` · ${formatTimestamp(video.durationSeconds)}` : ""}{sourceDateLabel(video.sourcePublishedAt) ? ` · ${sourceDateLabel(video.sourcePublishedAt)}` : ""}</p>
-          <div className="taxonomy-row">
-            <TaxonomyPicker title="Colecciones" items={data.collections} selectedIds={video.collections.map((item) => item.id)} icon={<Folder size={14} />} onChange={(ids) => updateTaxonomy("collections", ids)} onCreate={(name) => createTaxonomy("collections", name)} />
-            <TaxonomyPicker title="Etiquetas" items={data.tags} selectedIds={video.tags.map((item) => item.id)} icon={<Tag size={14} />} onChange={(ids) => updateTaxonomy("tags", ids)} />
-          </div>
-        </div>
-        <div className="video-actions">
-          {!isTweet && <button className="icon-button" onClick={onStartChat} aria-label="Conversar con esta fuente" disabled={video.status !== "ready"} title={video.status === "ready" ? "Conversar con esta fuente" : "Analiza la fuente para poder conversar"}><MessageCircle size={19} /></button>}
-          <div className="action-menu-wrap"><button className="icon-button" onClick={() => setMenuOpen(!menuOpen)} aria-label="Más opciones"><MoreHorizontal size={19} /></button>{menuOpen && <div className="action-menu"><a href={video.url} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Abrir en {sourceLabel(video.sourceType)}</a><button onClick={() => { setMenuOpen(false); setEditTitleOpen(true); }}><Pencil size={15} /> Cambiar título</button><button onClick={retry}>{video.status === "saved" ? <Sparkles size={15} /> : <RefreshCw size={15} />}{video.status === "saved" ? "Analizar con IA" : "Volver a procesar"}</button><button className="danger" onClick={remove}><Trash2 size={15} /> Eliminar</button></div>}</div>
-        </div>
-      </header>
-      <nav className="content-tabs">
-        <button className={tab === "notebook" ? "active" : ""} onClick={() => setTab("notebook")}><NotebookPen size={15} /> Notebook</button>
-        {!isTweet && <button className={chatOpen ? "active" : ""} onClick={onStartChat} disabled={video.status !== "ready"} title={video.status === "ready" ? (chatOpen ? "Cerrar chat" : "Conversar") : "Disponible después de analizar"}><MessageCircle size={15} /> Chat</button>}
-        <button className={tab === "reader" ? "active" : ""} onClick={() => setTab("reader")}><BookOpen size={15} /> {video.sourceType === "web" ? "Artículo" : video.sourceType !== "youtube" ? "Publicación" : "Reader"}</button>
-        {!isTweet && <button className={tab === "quiz" ? "active" : ""} onClick={() => setTab("quiz")}><ListChecks size={15} /> Quiz</button>}
-        <button className={tab === "connections" ? "active" : ""} onClick={() => setTab("connections")}><Link2 size={15} /> Connections</button>
-        {!isTweet && <button className={tab === "graph" ? "active" : ""} onClick={() => setTab("graph")}><Network size={15} /> Graph</button>}
-      </nav>
-      <div className="content-scroll">
-        {video.status !== "ready" && <ProcessingState video={video} onRetry={retry} onTranscribe={transcribe} hasAiKey={data.hasAiKey} aiProvider={data.aiProvider} />}
-        {tab === "notebook" && video.status === "ready" && <NotebookView video={video} note={note} onNoteChange={setNote} onSaveNote={saveNote} savingNote={savingNote} />}
-        {tab === "reader" && video.status === "ready" && <TranscriptView video={video} chunks={detail.transcript} />}
-        {tab === "quiz" && video.status === "ready" && <QuizView video={video} />}
-        {tab === "connections" && video.status === "ready" && <ConnectionsView video={video} data={data} onSelectVideo={onSelectVideo} onRefresh={onRefresh} />}
-        {tab === "graph" && video.status === "ready" && <GraphView video={video} data={data} onSelectVideo={onSelectVideo} />}
-      </div>
-      {editTitleOpen && <EditVideoTitleModal video={video} onClose={() => setEditTitleOpen(false)} onSaved={onRefresh} />}
-    </main>
-  );
-}
 
-function ProcessingState({ video, onRetry, onTranscribe, hasAiKey, aiProvider }: { video: AppVideo; onRetry: () => void; onTranscribe: () => void; hasAiKey: boolean; aiProvider: Bootstrap["aiProvider"] }) {
-  if (video.status === "saved") return <section className="state-card saved-video-state"><span className="state-icon saved"><Bookmark size={22} /></span><p className="eyebrow">Guardado para después</p><h2>Este enlace está en tu biblioteca</h2><p>No se ha usado IA. Puedes abrirlo en {sourceLabel(video.sourceType)}, organizarlo en colecciones o analizarlo cuando te resulte útil.</p><div className="saved-video-actions"><a className="secondary-button" href={video.url} target="_blank" rel="noreferrer"><ExternalLink size={16} /> Abrir en {sourceLabel(video.sourceType)}</a><button className="primary-button" onClick={onRetry}><Sparkles size={16} /> Analizar ahora</button></div></section>;
-  if (video.status === "needs_transcript") {
-    const minutes = Math.max(1, Math.ceil(video.durationSeconds / 60));
-    const estimatedCost = aiProvider === "gemini" ? "US$0 dentro del nivel gratuito" : `aproximadamente US$${(minutes * 0.006).toFixed(2)}`;
-    return <section className="state-card"><span className="state-icon warning"><FileText size={22} /></span><p className="eyebrow">Hace falta una decisión</p><h2>No pudimos obtener subtítulos</h2><p>Puedes conservarlo como referencia o permitir que Lúmina descargue el audio temporalmente para transcribirlo con IA. El audio se elimina al terminar.</p><small>Estimación: {minutes} min de audio · {estimatedCost}</small><button className="primary-button" onClick={onTranscribe} disabled={!hasAiKey}><Sparkles size={17} /> Transcribir audio con IA</button>{!hasAiKey && <small>Primero añade tu clave gratuita de Gemini en Ajustes.</small>}</section>;
-  }
-  if (video.status === "failed") return <section className="state-card"><span className="state-icon error"><CircleAlert size={22} /></span><p className="eyebrow">No pudimos terminar</p><h2>Algo interrumpió el análisis</h2><p>{video.error || "La fuente o el proveedor de IA no respondió como esperábamos."}</p><button className="secondary-button" onClick={onRetry}><RefreshCw size={17} /> Intentar de nuevo</button></section>;
-  const steps = ["queued", "extracting", "indexing", "summarizing"];
-  const active = Math.max(0, steps.indexOf(video.status));
-  const labels = video.sourceType === "web" ? ["Preparando", "Limpiando el artículo", "Organizando secciones", "Escribiendo resumen"] : video.sourceType !== "youtube" ? ["Preparando", "Leyendo publicación", "Organizando ideas", "Escribiendo resumen"] : ["Preparando", "Leyendo subtítulos", "Organizando ideas", "Escribiendo resumen"];
-  return <section className="processing-view"><div className="processing-orb"><LoaderCircle className="spin" size={27} /></div><p className="eyebrow">Lúmina está trabajando</p><h2>Convirtiendo esta fuente en conocimiento</h2><p>Puedes seguir navegando. El proceso continuará en este Mac.</p><div className="processing-steps">{labels.map((label, index) => <span key={label} className={index < active ? "done" : index === active ? "active" : ""}><i>{index < active ? <Check size={13} /> : index + 1}</i>{label}</span>)}</div></section>;
-}
 
-function NotebookView({ video, note, onNoteChange, onSaveNote, savingNote }: {
-  video: AppVideo;
-  note: string;
-  onNoteChange: (value: string) => void;
-  onSaveNote: () => void;
-  savingNote: boolean;
-}) {
-  const summary = video.summary;
-  if (!summary) return null;
-  return (
-    <article className="summary-view notebook-view">
-      <section className="gist-card"><span><Sparkles size={16} /> Resumen conciso</span><p>{summary.gist}</p></section>
-      {!!summary.sections?.length && <section className="detailed-summary">
-        <div className="section-heading"><div><h2>Resumen detallado</h2></div><span>{summary.sections.length} temas</span></div>
-        <div className="summary-sections">{summary.sections.map((section, sectionIndex) => (
-          <section key={`${section.title}-${sectionIndex}`}>
-            <h3>{section.title}</h3>
-            <ul>{section.points.map((point, pointIndex) => <li key={`${point.text}-${pointIndex}`}><span>{point.text}</span>{video.sourceType === "youtube" && point.startSeconds !== null && <a href={sourceHref(video, point.startSeconds)} target="_blank" rel="noreferrer" title={`Ver este punto en ${formatTimestamp(point.startSeconds)}`}>{formatTimestamp(point.startSeconds)}</a>}</li>)}</ul>
-          </section>
-        ))}</div>
-      </section>}
-      <section>
-        <div className="section-heading"><div><h2>Ideas clave</h2></div><span>{summary.keyPoints.length} ideas</span></div>
-        <div className="key-points">{summary.keyPoints.map((point, index) => (
-          <div key={`${point.text}-${index}`}>
-            <span>{String(index + 1).padStart(2, "0")}</span>
-            <p>{point.text}</p>
-            {video.sourceType === "youtube" && point.startSeconds !== null && <a href={sourceHref(video, point.startSeconds)} target="_blank" rel="noreferrer" title={`Ver esta idea en ${formatTimestamp(point.startSeconds)}`} aria-label={`Abrir esta idea en ${formatTimestamp(point.startSeconds)}`}><small>{formatTimestamp(point.startSeconds)}</small><ArrowUpRight size={16} /></a>}
-          </div>
-        ))}</div>
-      </section>
-      <section className="takeaways"><div className="section-heading"><div><h2>Conclusiones</h2></div></div><div>{summary.takeaways.map((item, index) => <p key={`${item}-${index}`}><Check size={16} />{item}</p>)}</div></section>
-      <section className="notebook-notes">
-        <div className="section-heading"><div><p className="eyebrow">Tu espacio</p><h2>Notas compartidas</h2></div>{video.note && <small>Editado por {video.note.updatedByName}</small>}</div>
-        <textarea value={note} onChange={(event) => onNoteChange(event.target.value)} placeholder="Escribe lo que quieres recordar, relaciones con otras ideas o algo que quieras poner en práctica…" />
-        <div className="notebook-note-actions"><small>Visible para los dos perfiles</small><button className="primary-button" onClick={onSaveNote} disabled={savingNote}>{savingNote ? <LoaderCircle className="spin" size={16} /> : <Check size={16} />} Guardar nota</button></div>
-      </section>
-    </article>
-  );
-}
 
-function QuizView({ video }: { video: AppVideo }) {
-  const summary = video.summary;
-  const [revealed, setRevealed] = useState<Set<number>>(new Set());
-  if (!summary) return null;
-  const questions = [
-    { question: `¿Cuál es la idea central de ${video.sourceType === "web" ? "este artículo" : video.sourceType !== "youtube" ? "esta publicación" : "esta fuente"}?`, answer: summary.gist, time: 0 },
-    ...summary.chapters.slice(0, 4).map((chapter) => ({ question: `¿Qué explica el capítulo “${chapter.title}”?`, answer: chapter.summary, time: chapter.startSeconds })),
-    ...summary.takeaways.slice(0, 1).map((takeaway) => ({ question: "¿Qué conclusión conviene recordar y aplicar?", answer: takeaway, time: 0 })),
-  ];
-  const toggle = (index: number) => setRevealed((current) => {
-    const next = new Set(current);
-    if (next.has(index)) next.delete(index); else next.add(index);
-    return next;
-  });
-  return (
-    <section className="quiz-view">
-      <div className="feature-heading"><div><p className="eyebrow">Repaso activo</p><h2>Comprueba qué recuerdas</h2><p>Piensa tu respuesta y luego revela la explicación basada en la fuente.</p></div><div className="quiz-progress"><strong>{revealed.size}/{questions.length}</strong><span>revisadas</span></div></div>
-      <div className="quiz-meter"><i style={{ width: `${questions.length ? revealed.size / questions.length * 100 : 0}%` }} /></div>
-      <div className="quiz-list">
-        {questions.map((item, index) => {
-          const isOpen = revealed.has(index);
-          return <article className={`quiz-card ${isOpen ? "revealed" : ""}`} key={`${item.question}-${index}`}><div className="quiz-number">{String(index + 1).padStart(2, "0")}</div><div><p className="quiz-question">{item.question}</p>{isOpen && <div className="quiz-answer"><span>Respuesta</span><p>{item.answer}</p>{video.sourceType === "youtube" && item.time > 0 && <a href={sourceHref(video, item.time)} target="_blank" rel="noreferrer"><Play size={12} fill="currentColor" /> Ver desde {formatTimestamp(item.time)}</a>}</div>}</div><button onClick={() => toggle(index)} aria-label={isOpen ? "Ocultar respuesta" : "Revelar respuesta"}>{isOpen ? <RotateCcw size={16} /> : <Eye size={16} />}<span>{isOpen ? "Ocultar" : "Revelar"}</span></button></article>;
-        })}
-      </div>
-      {revealed.size > 0 && <button className="quiz-reset" onClick={() => setRevealed(new Set())}><RotateCcw size={15} /> Reiniciar repaso</button>}
-    </section>
-  );
-}
 
-function relatedVideos(video: AppVideo, videos: AppVideo[]) {
-  const tagIds = new Set(video.tags.map((item) => item.id));
-  const collectionIds = new Set(video.collections.map((item) => item.id));
-  return videos.filter((item) => item.id !== video.id).map((item) => {
-    const sharedTags = item.tags.filter((tag) => tagIds.has(tag.id));
-    const sharedCollections = item.collections.filter((collection) => collectionIds.has(collection.id));
-    const sameChannel = Boolean(video.channel && item.channel === video.channel);
-    return { video: item, sharedTags, sharedCollections, sameChannel, score: sharedTags.length * 3 + sharedCollections.length * 2 + (sameChannel ? 1 : 0) };
-  }).filter((item) => item.score > 0).sort((a, b) => b.score - a.score);
-}
 
-function ConnectionsView({ video, data, onSelectVideo, onRefresh }: { video: AppVideo; data: Bootstrap; onSelectVideo: (id: string | null) => void; onRefresh: () => Promise<void> }) {
-  const summary = video.summary;
-  const related = relatedVideos(video, data.videos);
-  const groups = [
-    { title: "Colecciones", icon: <Folder size={15} />, items: video.collections.map((collection) => ({ id: collection.id, label: collection.name, count: data.videos.filter((item) => item.collections.some((candidate) => candidate.id === collection.id)).length })) },
-    { title: "Ideas del video", icon: <Lightbulb size={15} />, items: (summary?.chapters ?? []).slice(0, 8).map((chapter, index) => ({ id: `chapter-${index}`, label: chapter.title, count: 1 })) },
-  ].filter((group) => group.items.length);
 
-  async function updateTags(tagIds: string[]) {
-    await jsonRequest(`/api/videos/${video.id}/tags`, { method: "PUT", body: JSON.stringify({ tagIds }) });
-    await onRefresh();
-  }
-
-  return (
-    <section className="connections-view">
-      <section className="connection-tag-manager">
-        <div className="connection-tag-heading"><div><Hash size={17} /><h2>Etiquetas</h2></div><TaxonomyPicker title="Agregar etiqueta" items={data.tags} selectedIds={video.tags.map((tag) => tag.id)} icon={<Plus size={14} />} onChange={(ids) => { void updateTags(ids); }} /></div>
-        {video.tags.length ? <div className="connection-editable-tags">{video.tags.map((tag) => <button key={tag.id} onClick={() => void updateTags(video.tags.filter((item) => item.id !== tag.id).map((item) => item.id))} title={`Quitar ${tag.name}`}><span className="tag-dot" style={{ background: tag.color }} />{tag.name}<X size={13} /></button>)}</div> : <p className="connection-tag-empty">Añade etiquetas para relacionar esta fuente con el resto de tu biblioteca.</p>}
-      </section>
-      <div className="connection-groups">
-        {groups.map((group) => <section key={group.title}><h3>{group.icon}{group.title}</h3><div className="connection-chips">{group.items.map((item) => <span key={item.id}>{item.label}<b>{item.count}</b></span>)}</div></section>)}
-      </div>
-      <section className="related-section"><div className="section-heading"><div><p className="eyebrow">En tu biblioteca</p><h2>Fuentes relacionadas</h2></div><span>{related.length}</span></div>{related.length ? <div className="related-videos">{related.map((item) => <button key={item.video.id} onClick={() => onSelectVideo(item.video.id)}><span className={`related-thumb ${item.video.sourceType !== "youtube" ? "x-source-mini" : ""}`} style={item.video.thumbnailUrl ? { backgroundImage: `url(${item.video.thumbnailUrl})` } : undefined}>{item.video.thumbnailUrl ? null : socialSourceMark(item.video.sourceType)}</span><div><strong>{item.video.title}</strong><p>{item.sharedTags.map((tag) => tag.name).concat(item.sharedCollections.map((collection) => collection.name)).concat(item.sameChannel ? ["Mismo autor o canal"] : []).join(" · ")}</p></div><ArrowUpRight size={16} /></button>)}</div> : <div className="connection-empty"><GitBranch size={22} /><div><strong>Aún no hay otra fuente conectada</strong><p>Cuando agregues fuentes con etiquetas, colecciones o autores en común, aparecerán aquí automáticamente.</p></div></div>}</section>
-    </section>
-  );
-}
-
-function GraphView({ video, data, onSelectVideo }: { video: AppVideo; data: Bootstrap; onSelectVideo: (id: string | null) => void }) {
-  return <GraphWorkspace focusVideoId={video.id} collections={data.collections} tags={data.tags} onOpenVideo={(id) => onSelectVideo(id)} />;
-}
-
-function TranscriptView({ video, chunks }: { video: AppVideo; chunks: TranscriptChunk[] }) {
-  const [query, setQuery] = useState("");
-  const [translated, setTranslated] = useState(false);
-  const isWeb = video.sourceType === "web";
-  const isPost = video.sourceType === "x" || video.sourceType === "reddit";
-  const normalizedQuery = query.toLocaleLowerCase();
-  const filtered = chunks.filter((chunk) => chunk.text.toLocaleLowerCase().includes(normalizedQuery));
-  const filteredItems = video.sourceItems.filter((item) => `${item.metadata?.heading || ""} ${item.authorName} ${item.authorHandle} ${item.text}`.toLocaleLowerCase().includes(normalizedQuery));
-  const hasTranslation = isWeb && Boolean(video.summary?.sourceTranslation?.trim());
-  const sourceKind = video.sourceItems[0]?.metadata?.sourceKind === "substack" ? "Substack" : "Página web";
-  const empty = isWeb || isPost ? !filteredItems.length : !filtered.length;
-
-  return <section className={`transcript-view reader-view ${isWeb ? "web-reader-view" : ""}`}>
-    <div className="reader-intro">
-      <div><p className="eyebrow">{isWeb ? "Artículo guardado" : isPost ? "Texto guardado" : "Modo lectura"}</p><h2>{isWeb ? video.title : isPost ? video.sourceItems.length > 1 ? "Hilo" : "Publicación" : "Reader"}</h2><p>{isWeb ? "Lee la versión limpia. Cada sección conserva un enlace verificable a la página original." : isPost ? "Cada publicación conserva su enlace original y puede utilizarse como evidencia independiente en el chat." : "Lee la transcripción con calma y vuelve al momento exacto con un clic."}</p></div>
-      <div className="reader-tools"><div className="transcript-search"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar una palabra" /></div>{hasTranslation && <button className="reader-language-toggle" onClick={() => setTranslated((current) => !current)}><Languages size={14} />{translated ? "Ver original" : "Ver en español"}</button>}</div>
-    </div>
-    <div className="reader-meta"><span><FileText size={14} />{isWeb ? video.sourceItems.length : isPost ? video.sourceItems.length : chunks.length} {isWeb ? video.sourceItems.length === 1 ? "sección" : "secciones" : isPost ? video.sourceItems.length === 1 ? "publicación" : "publicaciones" : chunks.length === 1 ? "fragmento" : "fragmentos"}</span>{!isWeb && !isPost && <span><Play size={14} />{formatTimestamp(video.durationSeconds)}</span>}<span>{isWeb ? sourceKind : isPost ? video.threadStatus === "partial" ? "Hilo parcial" : video.sourceType === "reddit" ? "Reddit" : "X" : video.sourceLanguage ? video.sourceLanguage.toUpperCase() : "AUTO"}</span>{isWeb && video.sourceLanguage && <span>{video.sourceLanguage.toUpperCase()}</span>}</div>
-    {isWeb ? translated && hasTranslation ? <article className="web-article-translation">{video.summary!.sourceTranslation!.split(/\n{2,}/).filter(Boolean).map((paragraph, index) => <p key={`${paragraph.slice(0, 30)}-${index}`}>{paragraph}</p>)}</article> : <div className="web-article-reader">{filteredItems.map((item, index) => <article key={item.id}><header><span>{String(index + 1).padStart(2, "0")}</span><h3>{item.metadata?.heading || `Sección ${index + 1}`}</h3><a href={item.url || video.url} target="_blank" rel="noreferrer" aria-label="Abrir esta sección en la página original"><ExternalLink size={15} /></a></header>{item.text.split(/\n{2,}/).filter(Boolean).map((paragraph, paragraphIndex) => <p key={`${item.id}-${paragraphIndex}`}>{paragraph}</p>)}</article>)}</div> : isPost ? <div className="x-thread-reader">{filteredItems.map((item, index) => <article key={item.id}><span>{String(index + 1).padStart(2, "0")}</span><div><header><strong>{item.authorName}</strong>{item.authorHandle && <small>@{item.authorHandle}</small>}{item.publishedAt && <time>{sourceDateLabel(item.publishedAt)}</time>}</header><p>{item.text}</p></div><a href={item.url} target="_blank" rel="noreferrer" aria-label={`Abrir publicación en ${video.sourceType === "reddit" ? "Reddit" : "X"}`}><ExternalLink size={15} /></a></article>)}</div> : <div className="transcript-list">{filtered.map((chunk) => <a key={chunk.id} href={sourceHref(video, chunk.startSeconds)} target="_blank" rel="noreferrer"><span>{formatTimestamp(chunk.startSeconds)}</span><p>{chunk.text}</p><Play size={14} /></a>)}</div>}
-    {empty && <div className="reader-empty"><Search size={22} /><p>No encontramos esa palabra en {isWeb ? "el artículo" : isPost ? "la publicación o el hilo" : "la transcripción"}.</p></div>}
-  </section>;
-}
-
-function ChatPanel({ detail, onDetailRefresh, onClose }: { detail: Detail; onDetailRefresh: () => Promise<void>; onClose: () => void }) {
-  const [messages, setMessages] = useState<ChatMessage[]>(detail.messages);
-  const [question, setQuestion] = useState("");
-  const [loading, setLoading] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages]);
-
-  async function ask(value = question) {
-    const prompt = value.trim();
-    if (!prompt || loading) return;
-    setQuestion("");
-    setLoading(true);
-    setMessages((current) => [...current, { role: "user", content: prompt }, { role: "assistant", content: "", pending: true }]);
-    try {
-      const response = await fetch(`/api/videos/${detail.video.id}/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: prompt }) });
-      if (!response.ok || !response.body) throw new Error((await response.json()).error || "No se pudo responder.");
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      while (true) {
-        const { value: bytes, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(bytes, { stream: true });
-        const events = buffer.split("\n\n");
-        buffer = events.pop() || "";
-        for (const raw of events) {
-          if (!raw.startsWith("data: ")) continue;
-          const event = JSON.parse(raw.slice(6)) as { type: string; text?: string; citations?: Citation[]; message?: string };
-          if (event.type === "delta") setMessages((current) => current.map((message, index) => index === current.length - 1 ? { ...message, content: message.content + (event.text || "") } : message));
-          if (event.type === "done") setMessages((current) => current.map((message, index) => index === current.length - 1 ? { ...message, pending: false, citations: event.citations || [] } : message));
-          if (event.type === "error") throw new Error(event.message || "No se pudo responder.");
-        }
-      }
-      await onDetailRefresh();
-    } catch (cause) {
-      const rawMessage = cause instanceof Error ? cause.message : "No se pudo responder.";
-      const message = /Unexpected token|DOCTYPE|not valid JSON|429|RESOURCE_EXHAUSTED|quota|Failed to fetch/i.test(rawMessage)
-        ? "El proveedor de IA no está disponible en este momento. Intenta enviar la pregunta otra vez para usar la respuesta local basada en la transcripción."
-        : rawMessage;
-      setMessages((current) => current.map((item, index) => index === current.length - 1 ? { role: "assistant", content: message, pending: false } : item));
-    } finally { setLoading(false); }
-  }
-
-  return (
-    <aside className="chat-panel">
-      <header><div><span className="chat-spark"><Sparkles size={17} /></span><div><strong>Conversar</strong><small>Responde desde el video</small></div></div><button className="icon-button" onClick={onClose} aria-label="Cerrar chat"><X size={18} /></button></header>
-      <div className="chat-context"><span className="mini-thumb" style={{ backgroundImage: `url(${detail.video.thumbnailUrl})` }} /><div><small>CONTEXTO ACTIVO</small><strong>{detail.video.title}</strong></div><Check size={15} /></div>
-      <div className="chat-scroll" ref={scrollRef}>
-        {!messages.length && <div className="chat-empty"><span><MessageCircle size={23} /></span><h2>Pregunta lo que quieras</h2><p>Las respuestas se basan exclusivamente en la transcripción y enlazan el momento exacto.</p><div className="suggested-questions"><button onClick={() => ask("¿Cuál es la idea central del video?")}>¿Cuál es la idea central?</button><button onClick={() => ask("¿Qué argumentos o ejemplos utiliza?")}>¿Qué ejemplos utiliza?</button><button onClick={() => ask("¿Qué conclusiones prácticas puedo aplicar?")}>¿Qué puedo aplicar?</button></div></div>}
-        {messages.map((message, index) => <div key={message.id || index} className={`chat-message ${message.role}`}><div className="message-avatar">{message.role === "assistant" ? <Sparkles size={14} /> : "Tú"}</div><div className="message-content">{message.content ? <p>{message.content}</p> : <span className="typing"><i /><i /><i /></span>}{message.citations?.length ? <div className="message-citations">{message.citations.map((citation, citationIndex) => <a key={`${citation.sourceItemId || citation.startSeconds}-${citationIndex}`} href={citation.sourceItemUrl || sourceHref(detail.video, citation.startSeconds)} target="_blank" rel="noreferrer">{detail.video.sourceType !== "youtube" ? <ExternalLink size={11} /> : <Play size={11} fill="currentColor" />}{detail.video.sourceType !== "youtube" ? citation.label || "Publicación original" : citation.label}</a>)}</div> : null}</div></div>)}
-      </div>
-      <form className="chat-composer" onSubmit={(event) => { event.preventDefault(); void ask(); }}><textarea value={question} onChange={(event) => setQuestion(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void ask(); } }} placeholder={detail.video.status === "ready" ? "Pregunta sobre esta fuente…" : "Espera a que termine el análisis"} disabled={detail.video.status !== "ready"} /><div><span><Sparkles size={13} /> Citas activas</span><button disabled={!question.trim() || loading} aria-label="Enviar"><ArrowUpRight size={18} /></button></div></form>
-    </aside>
-  );
-}
 
 export function LuminaApp({ initialSurface = "home", initialConversationId = null }: { initialSurface?: AppSurface; initialConversationId?: string | null } = {}) {
   const [phase, setPhase] = useState<"loading" | "setup" | "login" | "app">("loading");
@@ -1659,21 +1180,18 @@ export function LuminaApp({ initialSurface = "home", initialConversationId = nul
       <button className="mobile-menu" onClick={() => setMobileSidebar(true)} aria-label="Abrir biblioteca"><Menu size={20} /></button>
       <div className={mobileSidebar ? "mobile-sidebar-wrap open" : "mobile-sidebar-wrap"} onMouseDown={(event) => event.target === event.currentTarget && setMobileSidebar(false)}>
         <div className="navigation-shell">
-          <AppRail data={data} surface={surface} sidebarCollapsed={sidebarCollapsed} onAdd={() => setAddOpen(true)} onHome={goHome} onChat={() => newChat()} onGraph={goGraph} onLearning={goLearning} onSpaces={goSpaces} onSerendipity={goSerendipity} onToggleSidebar={toggleSidebar} onSettings={() => setSettingsOpen(true)} onLogout={() => void logout()} panels={[{ key: "shelf", label: "En mente", icon: <Pin size={19} />, render: (close) => <ShelfPanel videos={data.videos.filter((video) => video.topPosition !== null && video.topPosition !== undefined).sort((a, b) => (a.topPosition ?? 0) - (b.topPosition ?? 0))} onOpen={(id) => { close(); setPreviewId(id); }} /> }, ...(brokenSources(data.videos).length ? [{ key: "issues", label: "Fuentes sin analizar", tone: "alert" as const, badge: brokenSources(data.videos).length, icon: <CircleAlert size={19} />, render: (close: () => void) => <AiIssuesPanel videos={brokenSources(data.videos)} lastError={data.aiLastError || ""} onOpen={(id) => { close(); setPreviewId(id); }} onRetried={async () => { await loadBootstrap(); }} /> }] : [])]} tagsActive={activeTagIds.length > 0} tagPanel={(close) => <CanonicalTagNavigation data={data} selectedIds={activeTagIds} open onToggleOpen={close} onChange={(ids) => { setActiveTagIds(ids); setLibraryScope("all"); setSurface("home"); setSelectedId(null); setActiveCollection(null); setActiveSpaceId(null); }} onMigrate={() => { close(); setTaxonomyMigrationOpen(true); }} />} />
-          {!sidebarCollapsed && (surface === "chat" ? <ChatHistorySidebar conversations={conversations} activeId={activeConversationId} onNew={() => newChat()} onOpen={openConversation} onRename={async (id, title) => { await jsonRequest(`/api/conversations/${id}`, { method: "PATCH", body: JSON.stringify({ title }) }); await loadConversations(); }} onPin={async (id, pinned) => { await jsonRequest(`/api/conversations/${id}`, { method: "PATCH", body: JSON.stringify({ pinned }) }); await loadConversations(); }} onDelete={async (id) => { if (!window.confirm("¿Eliminar esta conversación? Las fuentes se conservarán.")) return; await jsonRequest(`/api/conversations/${id}`, { method: "DELETE" }); const remaining = await loadConversations(); if (id === activeConversationId) { if (remaining[0]) openConversation(remaining[0].id); else newChat(); } }} /> : !railOnly ? <Sidebar data={data} activeSpaceId={activeSpaceId} spacesActive={surface === "spaces"} onOpenSpace={openSpace} onSpaces={goSpaces} onSerendipity={goSerendipity} onReview={goLearning} selectedId={surface === "video" ? selectedId : null} activeCollection={activeCollection} selectedTagIds={activeTagIds} todoActive={surface === "home" && libraryScope === "all"} onSelect={(id) => { openVideo(id); setMobileSidebar(false); }} onSearch={onSearch} onTodo={goHome} onTagIds={(ids) => { setActiveTagIds(ids); setLibraryScope("all"); setSurface("home"); setSelectedId(null); setActiveCollection(null); setMobileSidebar(false); }} onMigrateTags={() => setTaxonomyMigrationOpen(true)} onCollection={(id) => { if (id) openCollection(id); else goHome(); }} onSettings={() => setSettingsOpen(true)} onLogout={logout} onRefresh={async () => { await loadBootstrap(); }} /> : null)}
+          <AppRail data={data} surface={surface} sidebarCollapsed={sidebarCollapsed} onAdd={() => setAddOpen(true)} onHome={goHome} onChat={() => newChat()} onGraph={goGraph} onLearning={goLearning} onSpaces={goSpaces} onSerendipity={goSerendipity} onToggleSidebar={toggleSidebar} onSettings={() => setSettingsOpen(true)} onLogout={() => void logout()} panels={[{ key: "week", label: "Tu semana", icon: <CalendarDays size={19} />, render: (close) => <WeekPanel videos={data.videos} onOpen={(id) => { close(); setPreviewId(id); }} onSearch={(query) => { close(); searchLibrary(query); }} /> }, { key: "shelf", label: "En mente", icon: <Pin size={19} />, render: (close) => <ShelfPanel videos={data.videos.filter((video) => video.topPosition !== null && video.topPosition !== undefined).sort((a, b) => (a.topPosition ?? 0) - (b.topPosition ?? 0))} onOpen={(id) => { close(); setPreviewId(id); }} /> }, ...(brokenSources(data.videos).length ? [{ key: "issues", label: "Fuentes sin analizar", tone: "alert" as const, badge: brokenSources(data.videos).length, icon: <CircleAlert size={19} />, render: (close: () => void) => <AiIssuesPanel videos={brokenSources(data.videos)} lastError={data.aiLastError || ""} onOpen={(id) => { close(); setPreviewId(id); }} onRetried={async () => { await loadBootstrap(); }} /> }] : [])]} tagsActive={activeTagIds.length > 0} tagPanel={(close) => <CanonicalTagNavigation data={data} selectedIds={activeTagIds} open onToggleOpen={close} onChange={(ids) => { setActiveTagIds(ids); setLibraryScope("all"); setSurface("home"); setSelectedId(null); setActiveCollection(null); setActiveSpaceId(null); }} onMigrate={() => { close(); setTaxonomyMigrationOpen(true); }} />} />
+          {!sidebarCollapsed && (surface === "chat" ? <ChatHistorySidebar conversations={conversations} activeId={activeConversationId} onNew={() => newChat()} onOpen={openConversation} onRename={async (id, title) => { await jsonRequest(`/api/conversations/${id}`, { method: "PATCH", body: JSON.stringify({ title }) }); await loadConversations(); }} onPin={async (id, pinned) => { await jsonRequest(`/api/conversations/${id}`, { method: "PATCH", body: JSON.stringify({ pinned }) }); await loadConversations(); }} onDelete={async (id) => { if (!window.confirm("¿Eliminar esta conversación? Las fuentes se conservarán.")) return; await jsonRequest(`/api/conversations/${id}`, { method: "DELETE" }); const remaining = await loadConversations(); if (id === activeConversationId) { if (remaining[0]) openConversation(remaining[0].id); else newChat(); } }} /> : null)}
           {!railOnly && !sidebarCollapsed && <button className="sidebar-resizer" onPointerDown={beginSidebarResize} aria-label="Cambiar ancho del panel izquierdo" title="Arrastra para cambiar el ancho" />}
         </div>
       </div>
       {(surface === "home" || surface === "ask") && <KnowledgeHome key={`home-${surface}-${libraryScope}-${activeSpace?.id || ""}-${homeSearch.run}`} initialQuery={homeSearch.query} onSearchQuery={searchLibrary} spaces={data.spaces} activeSpace={activeSpace} onOpenSpace={openSpace} onDeleteSpace={(id) => void deleteSpace(id)} onSpaceCreated={(space) => void loadBootstrap().then(() => openSpace(space.id))} onClearSpace={goHome} scopeActive={libraryScope !== "all" && libraryScope !== null} onPreview={(id, sequence) => { setPreviewId(id); setPreviewSequence(sequence ?? []); }} onAskSource={askSource} profileId={data.profile.id} videos={homeVibe ? data.videos.filter((video) => homeVibe.ids.includes(video.id)) : activeSpace ? folderScopedVideos : visibleLibraryVideos} shelf={libraryScope === "all" && !activeTagIds.length ? data.videos.filter((video) => video.topPosition !== null && video.topPosition !== undefined).sort((a, b) => (a.topPosition ?? 0) - (b.topPosition ?? 0)) : []} vibe={homeVibe} onVibe={(video) => void openVibe(video)} onClearVibe={goHome} collections={data.collections} tags={data.tags} models={data.models} libraryNavigation={<LibraryScopeNavigation data={data} libraryScope={libraryScope} onLibraryScope={chooseLibraryScope} placement="top" pool={activeSpace ? folderVideos : undefined} />} initialTagId={activeTag} initialMode={surface === "ask" ? "ask" : "overview"} onModeChange={(mode) => { setSurface(mode === "ask" ? "ask" : "home"); const path = mode === "ask" ? "/?view=ask" : "/"; if (`${window.location.pathname}${window.location.search}` !== path) window.history.pushState({}, "", path); }} onAdd={() => setAddOpen(true)} onOpenVideo={openVideo} onOpenConversation={openConversation} onConversationChanged={() => void loadConversations()} onRefresh={async () => { await loadBootstrap(); }} />}
-      {surface === "collection" && selectedCollection && <CollectionWorkspace key={selectedCollection.id} collection={selectedCollection} videos={collectionVideos} allVideos={data.videos} collections={data.collections} tags={data.tags} models={data.models} onOpenVideo={openLibrarySource} onOpenConversation={openConversation} onConversationChanged={() => void loadConversations()} onRefresh={async () => { await loadBootstrap(); }} onDeleted={() => { setActiveCollection(null); setSurface("home"); }} />}
       {surface === "graph" && <GraphWorkspace collections={data.collections} tags={data.tags} onOpenVideo={openLibrarySource} />}
       {surface === "learning" && <DailyReview videos={data.videos} catalog={data.tags} collections={data.collections} spaces={data.spaces} onChanged={async () => { await loadBootstrap(); }} onOpenVideo={openVideo} />}
       {surface === "spaces" && <SpacesWorkspace spaces={data.spaces} videos={data.videos} tags={data.tags} onOpenSpace={openSpace} onChanged={async () => { await loadBootstrap(); }} />}
       {surface === "serendipity" && <SerendipityWorkspace videos={data.videos} catalog={data.tags} collections={data.collections} spaces={data.spaces} onSearch={searchLibrary} onVibe={(video) => void openVibe(video)} onChanged={async () => { await loadBootstrap(); }} onExit={goHome} onAsk={askSource} />}
       {previewId && <DetailModal key={previewId} videoId={previewId} sequence={previewSequence} catalog={data.tags} collections={data.collections} spaces={data.spaces} onSearch={searchLibrary} onVibe={(video) => void openVibe(video)} onClose={() => setPreviewId(null)} onChanged={async () => { await loadBootstrap(); }} onAsk={askSource} />}
       {surface === "chat" && <UnifiedChatWorkspace key={activeConversationId || "new-chat"} conversationId={activeConversationId} videos={data.videos} collections={data.collections} tags={data.tags} models={data.models} initialSelection={newChatSelection} onOpenConversation={openConversation} onConversationChanged={() => void loadConversations()} />}
-      {surface === "video" && (selectedId ? detail ? <VideoWorkspace key={`workspace-${detail.video.id}`} detail={detail} data={data} onRefresh={async () => { await loadBootstrap(); await loadDetail(); }} onSelectVideo={(id) => id ? openVideo(id) : goHome()} onStartChat={() => setVideoChatOpen((current) => !current)} chatOpen={videoChatOpen} /> : <main className="detail-loading"><LoaderCircle className="spin" size={24} /></main> : <EmptyWorkspace onAdd={() => setAddOpen(true)} />)}
-      {surface === "video" && videoChatOpen && detail && <ChatPanel key={`video-chat-${detail.video.id}`} detail={detail} onDetailRefresh={async () => { await loadBootstrap(); await loadDetail(); }} onClose={() => setVideoChatOpen(false)} />}
       {helpOpen && <ShortcutsHelp onClose={() => setHelpOpen(false)} />}
       {addOpen && <AddVideoModal tags={data.tags} onClose={() => setAddOpen(false)} onAdded={async (id) => { setAddOpen(false); openVideo(id); await loadBootstrap(); }} />}
       {settingsOpen && <SettingsModal bootstrap={data} onClose={() => setSettingsOpen(false)} onSaved={() => void loadBootstrap()} />}

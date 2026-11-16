@@ -2756,3 +2756,9 @@ html[data-theme="dark"] .app-rail .rail-theme:hover { background: rgba(255,255,2
 .lv-serendipity-note .lv-note-mic:hover { background: #f3f1ec; color: #2b2723; }
 .lv-serendipity-note .lv-note-mic.recording { background: #e75e3a; color: #fff; animation: lv-mic-pulse 1.4s ease-in-out infinite; }
 .lv-insight footer.lv-actions > .lv-actions-inner { display: grid !important; width: max-content !important; max-width: 100%; height: auto !important; padding: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; }
+/* «Tu semana» */
+.week-panel h4 { margin: 12px 4px 4px; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.week-themes { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 4px 4px; }
+.week-themes button { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border: 0; border-radius: 99px; background: #f0eee9; color: #3b3832; font-size: 12.5px; cursor: pointer; }
+.week-themes button b { color: #8d887f; font-size: 11px; }
+.week-themes button:hover { background: #e7e3db; }
