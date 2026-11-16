@@ -589,7 +589,7 @@ function BoardsGrid({ boards, collections, videos, onOpen }: { boards: Collectio
   })}</div>;
 }
 
-export function KnowledgeHome({ notice, onClearSpace, scopeActive, profileId, videos, collections, tags, models, libraryNavigation, initialTagId, initialMode = "overview", spaces = [], activeSpace = null, shelf = [], initialQuery = "", vibe = null, onVibe, onClearVibe, onSearchQuery, onOpenSpace, onDeleteSpace, onSpaceCreated, onPreview, onAskSource, onModeChange, onAdd, onOpenVideo, onOpenConversation, onConversationChanged, onRefresh }: {
+export function KnowledgeHome({ onClearSpace, scopeActive, profileId, videos, collections, tags, models, libraryNavigation, initialTagId, initialMode = "overview", spaces = [], activeSpace = null, shelf = [], initialQuery = "", vibe = null, onVibe, onClearVibe, onSearchQuery, onOpenSpace, onDeleteSpace, onSpaceCreated, onPreview, onAskSource, onModeChange, onAdd, onOpenVideo, onOpenConversation, onConversationChanged, onRefresh }: {
   profileId: string;
   videos: AppVideo[];
   collections: Collection[];
@@ -611,7 +611,6 @@ export function KnowledgeHome({ notice, onClearSpace, scopeActive, profileId, vi
   onSpaceCreated?: (space: SmartSpace) => void;
   onClearSpace?: () => void;
   scopeActive?: boolean;
-  notice?: React.ReactNode;
   onPreview?: (id: string, sequence?: string[]) => void;
   onAskSource?: (id: string) => void;
   onModeChange?: (mode: "overview" | "ask") => void;
@@ -657,6 +656,23 @@ export function KnowledgeHome({ notice, onClearSpace, scopeActive, profileId, vi
   const [bulkError, setBulkError] = useState("");
   const [cardSize, setCardSize] = useState<"l" | "m" | "s">("m");
   const [searchPanel, setSearchPanel] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  // Como en mymind: empezar a escribir en cualquier parte de la biblioteca lleva directo al buscador.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey || event.key.length !== 1 || event.isComposing) return;
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      if (target?.closest("input, textarea, select, [contenteditable='true'], [contenteditable='']")) return;
+      if (document.querySelector(".lv-modal, .modal-backdrop, .rail-popover, .lv-folder-menu")) return;
+      if (!searchInputRef.current || event.key === " ") return;
+      event.preventDefault();
+      searchInputRef.current.focus();
+      setQuery((current) => `${current}${event.key}`);
+      changeMode("overview");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
   // Por defecto, bajo el buscador salen las carpetas; los tipos (Videos, Web…) solo al pulsar el buscador o si hay uno activo.
   const searchActive = searchPanel || Boolean(query.trim()) || Boolean(scopeActive);
   const [addMenu, setAddMenu] = useState(false);
@@ -955,13 +971,13 @@ export function KnowledgeHome({ notice, onClearSpace, scopeActive, profileId, vi
     <header className={`home-library-toolbar ${filtersOpen ? "filters-open" : ""}`}>
       {/* Al abrir una carpeta nada cambia de sitio: el buscador sigue aquí y su bolita se pone negra. */}
       <>
-      <div className="home-toolbar-main"><div className="lv-search-wrap"><label className="library-query"><Search size={15} />{queryPills(query).pills.map((pill) => <span key={pill.token} className="lv-query-pill" onMouseDown={(event) => event.preventDefault()}>{pill.swatch && <i style={{ background: pill.swatch }} />}{pill.label}<button type="button" aria-label={`Quitar ${pill.label}`} onClick={() => { setQuery(queryPills(query).pills.filter((item) => item.token !== pill.token).map((item) => item.token).concat(queryPills(query).text ? [queryPills(query).text] : []).join(" ")); changeMode("overview"); }}><X size={11} /></button></span>)}<input value={queryPills(query).text} onFocus={() => setSearchPanel(true)} onBlur={() => setSearchPanel(false)} onKeyDown={(event) => {
+      <div className="home-toolbar-main"><div className="lv-search-wrap"><label className="library-query"><Search size={15} />{queryPills(query).pills.map((pill) => <span key={pill.token} className="lv-query-pill" onMouseDown={(event) => event.preventDefault()}>{pill.swatch && <i style={{ background: pill.swatch }} />}{pill.label}<button type="button" aria-label={`Quitar ${pill.label}`} onClick={() => { setQuery(queryPills(query).pills.filter((item) => item.token !== pill.token).map((item) => item.token).concat(queryPills(query).text ? [queryPills(query).text] : []).join(" ")); changeMode("overview"); }}><X size={11} /></button></span>)}<input ref={searchInputRef} value={queryPills(query).text} onFocus={() => setSearchPanel(true)} onBlur={() => setSearchPanel(false)} onKeyDown={(event) => {
           if (tagSuggestions.length && (event.key === "ArrowDown" || event.key === "ArrowUp")) { event.preventDefault(); setTagCursor((current) => (current + (event.key === "ArrowDown" ? 1 : -1) + tagSuggestions.length) % tagSuggestions.length); return; }
           if (tagSuggestions.length && (event.key === "Enter" || event.key === "Tab")) { event.preventDefault(); chooseTag(tagSuggestions[Math.min(tagCursor, tagSuggestions.length - 1)].name); return; }
           if (event.key === "Escape") (event.target as HTMLInputElement).blur();
           const parts = queryPills(query);
           if (event.key === "Backspace" && !parts.text && parts.pills.length) { event.preventDefault(); setQuery(parts.pills.slice(0, -1).map((item) => item.token).join(" ")); }
-        }} onChange={(event) => { const parts = queryPills(query); setQuery([...parts.pills.map((item) => item.token), event.target.value].join(" ").replace(/^\s+/, "")); changeMode("overview"); }} placeholder={queryPills(query).pills.length ? "" : dictation.state === "recording" ? "Escuchando…" : dictation.state === "working" ? "Pasando tu voz a texto…" : activeSpace ? `Busca en ${activeSpace.name}…` : "Busca en tu Lúmina…"} /><button type="button" className={`lv-search-mic ${dictation.state}`} onClick={dictation.toggle} disabled={dictation.state === "working"} aria-pressed={dictation.state === "recording"} aria-label={dictation.state === "recording" ? "Terminar de dictar" : "Buscar con la voz"} title={dictation.state === "recording" ? "Terminar de dictar" : "Buscar con la voz"}>{dictation.state === "working" ? <LoaderCircle className="spin" size={17} /> : dictation.state === "recording" ? <Square size={14} /> : <Mic size={18} />}</button><kbd>⌘ K</kbd></label></div>{deferredQuery.trim() && !activeSpace && <button className="lv-save-space" onClick={() => setSavingSpace(true)}><Layers size={14} /> Guardar como carpeta inteligente</button>}</div>
+        }} onChange={(event) => { const parts = queryPills(query); setQuery([...parts.pills.map((item) => item.token), event.target.value].join(" ").replace(/^\s+/, "")); changeMode("overview"); }} placeholder={queryPills(query).pills.length ? "" : dictation.state === "recording" ? "Escuchando…" : dictation.state === "working" ? "Pasando tu voz a texto…" : activeSpace ? `Buscar en ${activeSpace.name}…` : "Buscar en Lúmina…"} /><button type="button" className={`lv-search-mic ${dictation.state}`} onClick={dictation.toggle} disabled={dictation.state === "working"} aria-pressed={dictation.state === "recording"} aria-label={dictation.state === "recording" ? "Terminar de dictar" : "Buscar con la voz"} title={dictation.state === "recording" ? "Terminar de dictar" : "Buscar con la voz"}>{dictation.state === "working" ? <LoaderCircle className="spin" size={17} /> : dictation.state === "recording" ? <Square size={14} /> : <Mic size={18} />}</button><kbd>⌘ K</kbd></label></div>{deferredQuery.trim() && !activeSpace && <button className="lv-save-space" onClick={() => setSavingSpace(true)}><Layers size={14} /> Guardar como carpeta inteligente</button>}</div>
       </>
       <div className="home-toolbar-actions"><div className="home-view-toggle"><button className={view === "mosaic" ? "active" : ""} onClick={() => { changeMode("overview"); changeView("mosaic"); }} title="Mosaico" aria-label="Mosaico"><LayoutGrid size={15} /></button><button className={view === "reader" ? "active" : ""} onClick={() => { changeMode("overview"); changeView("reader"); }} title="Lista y lector" aria-label="Lista y lector"><BookOpen size={15} /></button><button className={view === "cards" ? "active" : ""} onClick={() => { changeMode("overview"); changeView("cards"); }} title="Tarjetas" aria-label="Tarjetas"><Grid2X2 size={15} /></button></div><div className="lv-add-menu"><button className="primary-button home-add-button lv-round-add" onClick={() => setAddMenu((current) => !current)} aria-expanded={addMenu} aria-haspopup="menu" aria-label="Agregar" title="Agregar"><Plus size={20} /></button>
         {addMenu && <div className="lv-add-options" role="menu" onMouseLeave={() => setAddMenu(false)}>
@@ -1000,7 +1016,6 @@ export function KnowledgeHome({ notice, onClearSpace, scopeActive, profileId, vi
       {filterChips.length > 0 && <div className="active-filter-chips">{filterChips.map((chip) => <button key={chip.key} onClick={chip.clear}>{chip.label}<X size={11} /></button>)}</div>}
     </header>
     <div className="home-inner">
-      {notice}
       {mode === "ask" ? <div className="home-ask-composition"><header className="home-hero"><span><MessageCircle size={17} /> Chat con Lúmina</span><h1>Pregunta a lo que has aprendido.</h1></header><ScopedChatWorkspace scopeType={initialTagId ? "tag" : "selection"} scopeId={initialTagId || `home-${profileId}`} videos={videos} collections={collections} tags={tags} models={models} initialVideoIds={initialTagId ? videos.filter((video) => video.status === "ready").map((video) => video.id) : []} onOpenConversation={onOpenConversation} onConversationChanged={onConversationChanged} compact starter /></div> : <div className="home-overview">
         {!vibe && !activeSpace && !deferredQuery.trim() && shownView !== "reader" && <ShelfRow videos={shelf} onOpen={(id) => onPreview ? onPreview(id) : onOpenVideo(id)} onChanged={onRefresh} />}
         {vibe ? <div className="lv-space-heading lv-vibe-heading">{vibe.artwork && <img src={vibe.artwork} alt="" referrerPolicy="no-referrer" />}<div><h1>Misma vibra</h1><small>Con un aspecto parecido a: {vibe.title}</small></div><button onClick={onClearVibe} title="Salir de Misma vibra" aria-label="Salir de Misma vibra"><X size={15} /></button></div> : null}

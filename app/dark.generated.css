@@ -912,6 +912,17 @@ html[data-theme="dark"] .lv-folder-name:focus { background: hsl(0 0% 20%); }
 html[data-theme="dark"] .lv-folder-chips .lv-folder-chip.active > button:first-child { background: hsl(45 2% 32%); }
 html[data-theme="dark"] .lv-folder-chips .lv-folder-edit { background: hsl(0 0% 20%); color: hsl(38 6% 53%); }
 html[data-theme="dark"] .ai-health-banner { border: 1px solid hsl(17 13% 23%); background: hsl(21 18% 18%); }
+html[data-theme="dark"] .rail-list li > button:first-child:hover { background: hsl(45 3% 17%); }
+html[data-theme="dark"] .rail-list-thumb { background: hsl(43 3% 16%) center / cover no-repeat; }
+html[data-theme="dark"] .rail-list-retry { color: hsl(39 6% 71%); }
+html[data-theme="dark"] .rail-list-retry:hover { background: hsl(45 3% 17%); }
+html[data-theme="dark"] .lv-insight .lv-tag, html[data-theme="dark"] .lv-insight .lv-tag.type, html[data-theme="dark"] .lv-insight .lv-tag.primary, html[data-theme="dark"] .lv-insight .lv-tag.secondary, html[data-theme="dark"] .lv-insight .lv-tag.free { background: hsl(0 0% 20%); }
+html[data-theme="dark"] .lv-insight .lv-tag-icon { color: hsl(39 6% 71%); }
+html[data-theme="dark"] .lv-bubbles > a, html[data-theme="dark"] .lv-bubbles > button { background: hsl(0 0% 20%); color: hsl(38 6% 53%); }
+html[data-theme="dark"] .lv-serendipity-quick button { background: hsl(218 6% 17%); color: hsl(218 21% 55%); }
+html[data-theme="dark"] .lv-serendipity-quick button:hover { background: hsl(216 6% 15%); }
+html[data-theme="dark"] .lv-serendipity-note .lv-note-mic { color: hsl(39 6% 71%); }
+html[data-theme="dark"] .lv-serendipity-note .lv-note-mic:hover { background: hsl(43 4% 16%); color: hsl(30 3% 85%); }
 
 /* «ESC para cerrar» va sobre el fondo oscuro del modal: blanco también en modo oscuro. */
 html[data-theme="dark"] .lv-modal-esc { color: rgba(255,255,255,.82); }

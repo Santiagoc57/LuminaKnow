@@ -49,6 +49,19 @@ import {
   Trash2,
   WandSparkles,
   X,
+  Cpu,
+  PenTool,
+  Clapperboard,
+  Landmark,
+  ScrollText,
+  TrendingUp,
+  Users,
+  FlaskConical,
+  HeartPulse,
+  GraduationCap,
+  Target,
+  Megaphone,
+  Gamepad2,
 } from "lucide-react";
 import type { GhostAction } from "@/lib/ghost-prompt";
 import { findHighlightRanges } from "@/lib/highlight-ranges";
@@ -545,6 +558,21 @@ const TYPE_CHIPS: Record<AppVideo["sourceType"], { label: string; query: string;
   palette: { label: "Paleta", query: "tipo:paleta", Icon: Palette },
 };
 
+// Las etiquetas del catálogo llevan el icono de su tema (las subetiquetas, el de su tema padre);
+// las libres (las que pones tú o la IA) van sin icono. Así se ve de un vistazo qué es categoría y qué no.
+const THEME_ICONS: Record<string, typeof Play> = {
+  "Inteligencia artificial": Sparkles, "Tecnología": Cpu, "Diseño gráfico": PenTool, "Audiovisual": Clapperboard,
+  "Política": Landmark, "Filosofía": Lightbulb, "Historia": ScrollText, "Economía": TrendingUp, "Cultura": Users,
+  "Ciencia": FlaskConical, "Salud": HeartPulse, "Educación": GraduationCap, "Productividad": Target,
+  "Comunicación": Megaphone, "Entretenimiento": Gamepad2,
+};
+
+function CatalogTagIcon({ tag, catalog }: { tag: { id: string; name: string; level: string }; catalog: LibraryTag[] }) {
+  const parentName = tag.level === "primary" ? tag.name : catalog.find((item) => item.id === catalog.find((entry) => entry.id === tag.id)?.parentIds[0])?.name;
+  const Icon = (parentName && THEME_ICONS[parentName]) || Tag;
+  return <Icon size={12} className="lv-tag-icon" aria-hidden />;
+}
+
 // Primera capa: el tipo de cosa guardada. La pone Lúmina y no se puede quitar.
 function TypeChip({ video, onSearch }: { video: AppVideo; onSearch?: (query: string) => void }) {
   const chip = TYPE_CHIPS[video.sourceType];
@@ -883,7 +911,7 @@ function InsightPanel({ minutesOpen, onToggleMinutes, quizOpen, onToggleQuiz, re
   const highlights = (video.highlights ?? []).filter((highlight) => video.sourceType === "youtube" || bodyTexts.some((text) => text && findHighlightRanges(text, [highlight]).length));
 
   const ghostProps = { ...ghost, onSave: saveGhostAnswer, chat: chatMode, onOpenChat: () => onChatMode?.(true), onCloseChat: () => onChatMode?.(false), suggestions: ghostSuggestions(video) };
-  const footer = <footer className="lv-actions">
+  const footer = <footer className="lv-actions"><div className="lv-actions-inner">
       {!isNote && !isImage && !isPalette && <button className={`lv-consume ${video.consumedAt ? "done" : ""}`} disabled={busy} aria-pressed={Boolean(video.consumedAt)} onClick={() => void patch(video.consumedAt ? "unconsume" : "consume")}>{video.consumedAt ? <Check size={15} /> : <consume.Icon size={15} />}{video.consumedAt ? consume.done : consume.pending}</button>}
       {collectionsOpen && collections && <div className="lv-collection-picker" role="menu">
         {spaces && <>
@@ -899,10 +927,9 @@ function InsightPanel({ minutesOpen, onToggleMinutes, quizOpen, onToggleQuiz, re
           </form>
         </>}
       </div>}
-      {onToggleMinutes && video.sourceType === "youtube" && <button className={minutesOpen ? "on" : ""} aria-pressed={minutesOpen} onClick={onToggleMinutes} title="Resumen minuto a minuto" aria-label="Resumen minuto a minuto"><ListOrdered size={16} /></button>}
+      <div className="lv-bubbles">{onToggleMinutes && video.sourceType === "youtube" && <button className={minutesOpen ? "on" : ""} aria-pressed={minutesOpen} onClick={onToggleMinutes} title="Resumen minuto a minuto" aria-label="Resumen minuto a minuto"><ListOrdered size={16} /></button>}
       {onToggleQuiz && canQuiz(video) && <button className={quizOpen ? "on" : ""} aria-pressed={quizOpen} onClick={onToggleQuiz} title="Quiz: preguntas para repasar con el chatbot" aria-label="Quiz"><ListChecks size={16} /></button>}
-      {onToggleRelated && <button className={relatedOpen ? "on" : ""} aria-pressed={relatedOpen} onClick={onToggleRelated} title={`Conexiones${relatedCount ? ` · ${relatedCount}` : ""}`} aria-label="Conexiones"><Link2 size={16} /></button>}
-      {onToggleGraph && <button className={graphOpen ? "on" : ""} aria-pressed={graphOpen} onClick={onToggleGraph} title="Grafo de relaciones" aria-label="Grafo"><Waypoints size={16} /></button>}
+      {onToggleRelated && <button className={relatedOpen ? "on" : ""} aria-pressed={relatedOpen} onClick={onToggleRelated} title={`Conexiones y grafo${relatedCount ? ` · ${relatedCount}` : ""}`} aria-label="Conexiones y grafo"><Link2 size={16} /></button>}
       {isImage && <a href={video.thumbnailUrl} download title="Descargar" aria-label="Descargar imagen"><ArrowDown size={16} /></a>}
       {isPdf && <a href={`/api/media/${video.id}.pdf`} download={`${video.title.slice(0, 80)}.pdf`} title="Descargar PDF" aria-label="Descargar PDF"><ArrowDown size={16} /></a>}
       {collections && <button className={video.collections.length || inSomeSpace ? "on" : ""} onClick={() => setCollectionsOpen((current) => !current)} title="Carpetas" aria-label="Carpetas" aria-expanded={collectionsOpen}><Circle size={16} /></button>}
@@ -912,7 +939,7 @@ function InsightPanel({ minutesOpen, onToggleMinutes, quizOpen, onToggleQuiz, re
       {video.archivedAt
         ? <button disabled={busy} onClick={() => void patch("unarchive")} title="Restaurar" aria-label="Restaurar"><RotateCcw size={16} /></button>
         : <button disabled={busy} onClick={() => void patch("archive")} title="Archivar (se puede restaurar)" aria-label="Archivar"><Trash2 size={16} /></button>}
-  </footer>;
+  </div></div></footer>;
   if (chatMode && !isPalette && !isImage) return <aside className="lv-insight chat"><GhostSection {...ghostProps} />{footer}</aside>;
   return <aside className="lv-insight">
     <header>
@@ -940,7 +967,7 @@ function InsightPanel({ minutesOpen, onToggleMinutes, quizOpen, onToggleQuiz, re
       <h3>Etiquetas</h3>
       <div className="lv-tags">
         <TypeChip video={video} onSearch={onSearch} />
-        {video.tags.map((tag) => <span key={tag.id} className={`lv-tag ${tag.level}`}>{onSearch ? <button className="lv-tag-name" onClick={() => onSearch(`#${queryValue(tag.name)}`)} title={`Ver todo lo etiquetado ${tag.name}`}>{tag.level !== "free" && <i style={{ background: tag.color }} />}{tag.name}</button> : <>{tag.level !== "free" && <i style={{ background: tag.color }} />}{tag.name}</>}<button disabled={busy} onClick={() => void setTags(video.tags.filter((item) => item.id !== tag.id).map((item) => item.id))} aria-label={`Quitar ${tag.name}`}><X size={11} /></button></span>)}
+        {video.tags.map((tag) => <span key={tag.id} className={`lv-tag ${tag.level}`}>{onSearch ? <button className="lv-tag-name" onClick={() => onSearch(`#${queryValue(tag.name)}`)} title={`Ver todo lo etiquetado ${tag.name}`}>{tag.level !== "free" && <CatalogTagIcon tag={tag} catalog={catalog} />}{tag.name}</button> : <>{tag.level !== "free" && <CatalogTagIcon tag={tag} catalog={catalog} />}{tag.name}</>}<button disabled={busy} onClick={() => void setTags(video.tags.filter((item) => item.id !== tag.id).map((item) => item.id))} aria-label={`Quitar ${tag.name}`}><X size={11} /></button></span>)}
         <button className="lv-tag-add" onClick={() => setPickerOpen((current) => !current)} aria-expanded={pickerOpen} aria-label="Añadir etiqueta" title="Añadir etiqueta"><Plus size={14} /></button>
       </div>
       {pickerOpen && <div className="lv-tag-picker">
@@ -1664,6 +1691,7 @@ export function SerendipityWorkspace({ videos, catalog, collections, spaces, onS
   const [error, setError] = useState("");
   const [quick, setQuick] = useState<"" | "note" | "space">("");
   const [noteDraft, setNoteDraft] = useState("");
+  const noteDictation = useDictation((text) => setNoteDraft((current) => (current.trim() ? `${current.trim()} ${text}` : text)));
   const [flash, setFlash] = useState("");
   const music = useAmbientMusic();
   const current = deck[position];
@@ -1745,7 +1773,7 @@ export function SerendipityWorkspace({ videos, catalog, collections, spaces, onS
         <button className={quick === "note" ? "on" : ""} onClick={() => setQuick(quick === "note" ? "" : "note")}><StickyNote size={13} /> Nota</button>
         {(spaces ?? []).length > 0 && <button className={quick === "space" ? "on" : ""} onClick={() => setQuick(quick === "space" ? "" : "space")}><Folder size={13} /> Carpeta</button>}
       </div>
-      {quick === "note" && <form className="lv-serendipity-note" onSubmit={(event) => { event.preventDefault(); void saveQuickNote(); }}><textarea autoFocus rows={2} value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void saveQuickNote(); if (event.key === "Escape") setQuick(""); }} placeholder="¿Por qué vale la pena conservarlo?" /><button type="submit">Guardar</button></form>}
+      {quick === "note" && <form className="lv-serendipity-note" onSubmit={(event) => { event.preventDefault(); void saveQuickNote(); }}><textarea autoFocus rows={2} value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void saveQuickNote(); if (event.key === "Escape") setQuick(""); }} placeholder={noteDictation.state === "recording" ? "Escuchando… pulsa para terminar" : noteDictation.state === "working" ? "Pasando tu voz a texto…" : "¿Por qué vale la pena conservarlo?"} /><button type="button" className={`lv-note-mic ${noteDictation.state}`} onClick={noteDictation.toggle} disabled={noteDictation.state === "working"} aria-label={noteDictation.state === "recording" ? "Terminar de dictar" : "Dictar la nota"} title="Dictar">{noteDictation.state === "working" ? <LoaderCircle className="spin" size={14} /> : noteDictation.state === "recording" ? <Square size={12} /> : <Mic size={15} />}</button>{noteDictation.error && <p className="lv-error">{noteDictation.error}</p>}<button type="submit">Guardar</button></form>}
       {quick === "space" && <div className="lv-serendipity-spaces">{(spaces ?? []).map((space) => <button key={space.id} onClick={() => void addToSpace(space)}><i style={{ borderColor: space.color }} />{space.name}</button>)}</div>}
       {flash && <small className="lv-serendipity-flash">{flash}</small>}
       <small>{position + 1} de {deck.length} · usa las flechas ← →</small>

@@ -2709,3 +2709,50 @@ html[data-theme="dark"] .app-rail .rail-theme:hover { background: rgba(255,255,2
 .ai-health-banner small { color: #a8735f; }
 .ai-health-banner button { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 0; border-radius: 99px; background: var(--accent); color: #fff; font-size: 12.5px; font-weight: 600; cursor: pointer; }
 .ai-health-banner button.ghost { width: 30px; padding: 0; justify-content: center; background: transparent; color: #a8735f; }
+
+/* Riel: aviso de fuentes sin analizar y «En mente», en menús que no interrumpen el contenido. */
+.app-rail button .rail-badge { position: absolute; top: 3px; right: 3px; min-width: 16px; height: 16px; padding: 0 4px; display: grid; place-items: center; border-radius: 99px; background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; line-height: 1; }
+.app-rail button.rail-alert { color: var(--accent); }
+.rail-list-popover { width: 320px; padding: 12px; }
+.rail-list header { display: grid; gap: 2px; padding: 2px 4px 10px; }
+.rail-list header strong { font-size: 14px; }
+.rail-list header small { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.rail-list ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; max-height: 360px; overflow-y: auto; }
+.rail-list li { display: flex; align-items: center; gap: 4px; }
+.rail-list li > button:first-child { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 6px; border: 0; border-radius: 10px; background: none; text-align: left; cursor: pointer; }
+.rail-list li > button:first-child:hover { background: #f4f3f0; }
+.rail-list-thumb { width: 38px; height: 38px; flex: none; border-radius: 8px; background: #f0eee9 center / cover no-repeat; }
+.rail-list li span:last-child { min-width: 0; display: grid; gap: 1px; }
+.rail-list li strong { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rail-list li small { color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rail-list-retry { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; color: #8d887f; cursor: pointer; }
+.rail-list-retry:hover { background: #f4f3f0; color: var(--accent); }
+.rail-list-main { width: 100%; margin-top: 10px; height: 36px; display: flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 99px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+.rail-list-empty { margin: 4px; color: var(--muted); font-size: 13px; }
+
+/* Etiquetas del panel en blanco (se distinguen del fondo); las del catálogo con el icono de su tema. */
+.lv-insight .lv-tag, .lv-insight .lv-tag.type, .lv-insight .lv-tag.primary, .lv-insight .lv-tag.secondary, .lv-insight .lv-tag.free { background: #fff; box-shadow: 0 1px 2px rgba(45,41,32,.07); }
+.lv-insight .lv-tag-icon { flex: none; color: #8d887f; }
+.lv-insight .lv-tag .lv-tag-name { display: inline-flex; align-items: center; gap: 5px; }
+
+/* «Ya leí esto» mide lo mismo que la fila de bolitas. */
+.lv-insight footer.lv-actions { display: block; }
+.lv-actions-inner { width: max-content; max-width: 100%; margin: 0 auto; display: grid; gap: 8px; }
+.lv-actions-inner > .lv-consume { width: 100% !important; margin: 0 !important; }
+.lv-bubbles { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; }
+.lv-bubbles > a, .lv-bubbles > button { width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 50%; background: #fff; color: #5f5b54; box-shadow: 0 1px 3px rgba(45,41,32,.1); cursor: pointer; }
+.lv-bubbles > a:hover, .lv-bubbles > button:hover:not(:disabled) { color: var(--accent-dark); box-shadow: 0 3px 9px rgba(45,41,32,.16); }
+.lv-bubbles > button.on { color: var(--accent-dark); }
+
+/* Limpieza: «Nota» y «Carpeta» más pequeños y en otro tono, para no confundirlos con Conservar / Olvidar. */
+.lv-serendipity-quick { gap: 6px; }
+.lv-serendipity-quick button { height: 26px; padding: 0 10px; gap: 5px; border: 0; background: #eef1f6; color: #4b5a73; font-size: 11.5px; font-weight: 600; }
+.lv-serendipity-quick button:hover { background: #e2e8f1; }
+.lv-serendipity-quick button.on { background: #4b5a73; color: #fff; }
+/* Micrófono en la nota de Limpieza. */
+.lv-serendipity-note { position: relative; }
+.lv-serendipity-note textarea { padding-right: 46px; }
+.lv-serendipity-note .lv-note-mic { position: absolute; top: 6px; right: 6px; justify-self: auto; width: 32px; height: 32px; padding: 0; display: grid; place-items: center; border-radius: 50%; background: transparent; color: #8d887f; }
+.lv-serendipity-note .lv-note-mic:hover { background: #f3f1ec; color: #2b2723; }
+.lv-serendipity-note .lv-note-mic.recording { background: #e75e3a; color: #fff; animation: lv-mic-pulse 1.4s ease-in-out infinite; }
+.lv-insight footer.lv-actions > .lv-actions-inner { display: grid !important; width: max-content !important; max-width: 100%; height: auto !important; padding: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; }
