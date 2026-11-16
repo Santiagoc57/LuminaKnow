@@ -43,6 +43,8 @@ export async function GET(request: Request) {
       videos: listVideos(query),
       archived: listVideos({ archived: true }),
       spaces: listSmartSpaces(),
+      // Último fallo de la IA al resumir (para el aviso del inicio): solo el mensaje, sin datos de la fuente.
+      aiLastError: (() => { const error = (globalThis as { __luminaLastSummaryError?: unknown }).__luminaLastSummaryError; return error instanceof Error ? error.message.slice(0, 180) : ""; })(),
       collections,
       tags,
       usage: getMonthlyUsage(),

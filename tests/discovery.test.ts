@@ -123,3 +123,14 @@ test("Decisions: umbral por etiqueta y la subetiqueta arrastra su tema", async (
   assert.ok(!picked.includes("tag_secondary_redes_sociales"), "por debajo del umbral no entra");
   assert.ok(!picked.includes("tag_primary_comunicacion_y_medios"));
 });
+
+test("el PIN se bloquea tras 5 fallos y la espera crece", async () => {
+  const { loginWaitSeconds, recordLoginFailure, recordLoginSuccess } = await import("../lib/login-throttle");
+  const now = 1_000_000;
+  for (let i = 0; i < 4; i += 1) assert.equal(recordLoginFailure("p-test", now), 0);
+  assert.equal(recordLoginFailure("p-test", now), 30);
+  assert.equal(recordLoginFailure("p-test", now), 60);
+  assert.equal(loginWaitSeconds("p-test", now + 61_000), 0);
+  recordLoginSuccess("p-test");
+  assert.equal(recordLoginFailure("p-test", now), 0, "un acierto reinicia el contador");
+});

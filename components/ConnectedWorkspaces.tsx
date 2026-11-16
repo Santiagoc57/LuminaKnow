@@ -589,7 +589,7 @@ function BoardsGrid({ boards, collections, videos, onOpen }: { boards: Collectio
   })}</div>;
 }
 
-export function KnowledgeHome({ onClearSpace, scopeActive, profileId, videos, collections, tags, models, libraryNavigation, initialTagId, initialMode = "overview", spaces = [], activeSpace = null, shelf = [], initialQuery = "", vibe = null, onVibe, onClearVibe, onSearchQuery, onOpenSpace, onDeleteSpace, onSpaceCreated, onPreview, onAskSource, onModeChange, onAdd, onOpenVideo, onOpenConversation, onConversationChanged, onRefresh }: {
+export function KnowledgeHome({ notice, onClearSpace, scopeActive, profileId, videos, collections, tags, models, libraryNavigation, initialTagId, initialMode = "overview", spaces = [], activeSpace = null, shelf = [], initialQuery = "", vibe = null, onVibe, onClearVibe, onSearchQuery, onOpenSpace, onDeleteSpace, onSpaceCreated, onPreview, onAskSource, onModeChange, onAdd, onOpenVideo, onOpenConversation, onConversationChanged, onRefresh }: {
   profileId: string;
   videos: AppVideo[];
   collections: Collection[];
@@ -611,6 +611,7 @@ export function KnowledgeHome({ onClearSpace, scopeActive, profileId, videos, co
   onSpaceCreated?: (space: SmartSpace) => void;
   onClearSpace?: () => void;
   scopeActive?: boolean;
+  notice?: React.ReactNode;
   onPreview?: (id: string, sequence?: string[]) => void;
   onAskSource?: (id: string) => void;
   onModeChange?: (mode: "overview" | "ask") => void;
@@ -999,6 +1000,7 @@ export function KnowledgeHome({ onClearSpace, scopeActive, profileId, videos, co
       {filterChips.length > 0 && <div className="active-filter-chips">{filterChips.map((chip) => <button key={chip.key} onClick={chip.clear}>{chip.label}<X size={11} /></button>)}</div>}
     </header>
     <div className="home-inner">
+      {notice}
       {mode === "ask" ? <div className="home-ask-composition"><header className="home-hero"><span><MessageCircle size={17} /> Chat con Lúmina</span><h1>Pregunta a lo que has aprendido.</h1></header><ScopedChatWorkspace scopeType={initialTagId ? "tag" : "selection"} scopeId={initialTagId || `home-${profileId}`} videos={videos} collections={collections} tags={tags} models={models} initialVideoIds={initialTagId ? videos.filter((video) => video.status === "ready").map((video) => video.id) : []} onOpenConversation={onOpenConversation} onConversationChanged={onConversationChanged} compact starter /></div> : <div className="home-overview">
         {!vibe && !activeSpace && !deferredQuery.trim() && shownView !== "reader" && <ShelfRow videos={shelf} onOpen={(id) => onPreview ? onPreview(id) : onOpenVideo(id)} onChanged={onRefresh} />}
         {vibe ? <div className="lv-space-heading lv-vibe-heading">{vibe.artwork && <img src={vibe.artwork} alt="" referrerPolicy="no-referrer" />}<div><h1>Misma vibra</h1><small>Con un aspecto parecido a: {vibe.title}</small></div><button onClick={onClearVibe} title="Salir de Misma vibra" aria-label="Salir de Misma vibra"><X size={15} /></button></div> : null}

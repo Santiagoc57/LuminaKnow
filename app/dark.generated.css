@@ -911,6 +911,7 @@ html[data-theme="dark"] .home-toolbar-main .library-query .lv-search-mic:hover {
 html[data-theme="dark"] .lv-folder-name:focus { background: hsl(0 0% 20%); }
 html[data-theme="dark"] .lv-folder-chips .lv-folder-chip.active > button:first-child { background: hsl(45 2% 32%); }
 html[data-theme="dark"] .lv-folder-chips .lv-folder-edit { background: hsl(0 0% 20%); color: hsl(38 6% 53%); }
+html[data-theme="dark"] .ai-health-banner { border: 1px solid hsl(17 13% 23%); background: hsl(21 18% 18%); }
 
 /* «ESC para cerrar» va sobre el fondo oscuro del modal: blanco también en modo oscuro. */
 html[data-theme="dark"] .lv-modal-esc { color: rgba(255,255,255,.82); }

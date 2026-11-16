@@ -60,6 +60,7 @@ import type { AppVideo, AvailableModel, ChatSourceSelection, Citation, Conversat
 import { canSelectCatalogTag, matchingCatalogTags } from "@/lib/tag-picker";
 import { formatTimestamp, parseRedditUrl, parseSourceUrl, parseXUrl } from "@/lib/utils";
 import { matchesLibraryQuery, parseLibraryQuery } from "@/lib/library-query";
+import { isProvisionalSummary } from "@/lib/summary";
 import { BulkTaggingModal, CollectionWorkspace, GraphWorkspace, KnowledgeHome } from "./ConnectedWorkspaces";
 import { DailyReview } from "./ReviewViews";
 import { DetailModal, SerendipityWorkspace, SpacesWorkspace, spaceVideos } from "./DiscoverViews";
@@ -68,6 +69,7 @@ import { UnifiedChatWorkspace } from "./UnifiedChat";
 type Profile = { id: string; name: string; avatarColor: string };
 type Taxonomy = { id: string; name: string; color: string; description?: string; updatedAt?: string; level?: LibraryTag["level"] };
 type Bootstrap = {
+  aiLastError?: string;
   profile: Profile;
   videos: AppVideo[];
   archived: AppVideo[];
@@ -713,6 +715,17 @@ function MaintenanceSection() {
   const findDuplicates = async () => { setBusy("dup"); try { const result = await jsonRequest<{ duplicates: Array<{ reason: string; items: MaintenanceItem[] }> }>("/api/maintenance"); setDuplicates(result.duplicates); } finally { setBusy(""); } };
   const checkLinks = async () => { setBusy("links"); try { const result = await jsonRequest<{ broken: MaintenanceItem[] }>("/api/maintenance", { method: "POST", body: JSON.stringify({ action: "check-links" }) }); setBroken(result.broken); } finally { setBusy(""); } };
   const [copies, setCopies] = useState("");
+  const [retag, setRetag] = useState<{ running: boolean; total: number; done: number; changed: number; failed: number } | null>(null);
+  const startRetag = async () => {
+    if (!window.confirm("¿Reetiquetar toda la biblioteca con IA? Solo cambia las etiquetas que puso la IA (las tuyas se quedan). Cuesta menos de un centavo de dólar por cada 10 fuentes.")) return;
+    let status = await jsonRequest<NonNullable<typeof retag>>("/api/maintenance", { method: "POST", body: JSON.stringify({ action: "retag" }) });
+    setRetag(status);
+    while (status.running) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      status = await jsonRequest<NonNullable<typeof retag>>("/api/maintenance", { method: "POST", body: JSON.stringify({ action: "retag-status" }) });
+      setRetag(status);
+    }
+  };
   const saveCopies = async () => { setBusy("copies"); try { const result = await jsonRequest<{ saved: number; pending: number }>("/api/maintenance", { method: "POST", body: JSON.stringify({ action: "snapshots" }) }); setCopies(result.saved ? `Copias guardadas: ${result.saved}.${result.pending ? ` ${result.pending} páginas no respondieron.` : ""}` : result.pending ? `${result.pending} páginas no respondieron.` : "Todas las webs ya tenían copia."); } finally { setBusy(""); } };
   const archive = async (id: string) => { await jsonRequest(`/api/videos/${id}`, { method: "PATCH", body: JSON.stringify({ action: "archive" }) }); setArchived((current) => new Set([...current, id])); };
   const row = (item: MaintenanceItem, extra?: React.ReactNode) => <li key={item.id} className={archived.has(item.id) ? "done" : ""}>
@@ -726,9 +739,11 @@ function MaintenanceSection() {
     <div className="settings-actions">
       <button className="secondary-button" disabled={Boolean(busy)} onClick={() => void findDuplicates()}>{busy === "dup" ? "Buscando…" : "Buscar duplicados"}</button>
       <button className="secondary-button" disabled={Boolean(busy)} onClick={() => void checkLinks()}>{busy === "links" ? "Revisando enlaces… (puede tardar)" : "Revisar enlaces rotos"}</button>
+      <button className="secondary-button" disabled={Boolean(busy) || Boolean(retag?.running)} onClick={() => void startRetag()}>{retag?.running ? `Reetiquetando… ${retag.done}/${retag.total}` : "Reetiquetar con IA"}</button>
       <button className="secondary-button" disabled={Boolean(busy)} onClick={() => void saveCopies()}>{busy === "copies" ? "Guardando copias…" : "Guardar copias de las webs"}</button>
     </div>
     {copies && <small>{copies}</small>}
+    {retag && !retag.running && <small>Reetiquetado: {retag.total} fuentes revisadas, {retag.changed} con etiquetas nuevas{retag.failed ? `, ${retag.failed} sin respuesta de la IA` : ""}.</small>}
     {duplicates && (duplicates.length ? duplicates.map((group, index) => <div key={index} className="lv-maint-group"><strong>{group.reason}</strong><ul>{group.items.map((item) => row(item))}</ul></div>) : <small>No hay duplicados.</small>)}
     {broken && (broken.length ? <div className="lv-maint-group"><strong>Enlaces que ya no funcionan</strong><ul>{broken.map((item) => row(item, item.snapshotAt ? <a className="lv-maint-snapshot" href={`/api/snapshots/${item.id}`} target="_blank" rel="noreferrer">Ver copia guardada</a> : <em>sin copia</em>))}</ul></div> : <small>Todos los enlaces revisados responden.</small>)}
   </div>;
@@ -804,6 +819,25 @@ function ChatHistorySidebar({ conversations, activeId, onNew, onOpen, onRename, 
       </div>)}
     </section>)}{!conversations.length && <div className="empty-chat-history"><MessageSquare size={25} /><strong>Aún no hay chats</strong></div>}</div>
   </aside>;
+}
+
+// Aviso discreto cuando la IA no pudo analizar fuentes (resumen de respaldo o error), con un botón para reintentarlas.
+function AiHealthBanner({ videos, lastError, onRetried }: { videos: AppVideo[]; lastError: string; onRetried: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const broken = videos.filter((video) => video.status === "failed" || (video.status === "ready" && video.summary && isProvisionalSummary(video.summary.takeaways)));
+  if (!broken.length || dismissed) return null;
+  const retry = async () => {
+    setBusy(true);
+    try { for (const video of broken) await jsonRequest(`/api/videos/${video.id}`, { method: "PATCH", body: JSON.stringify({ action: "retry" }) }).catch(() => null); await onRetried(); }
+    finally { setBusy(false); }
+  };
+  return <div className="ai-health-banner" role="status">
+    <CircleAlert size={16} />
+    <span><strong>{broken.length === 1 ? "1 fuente no se pudo analizar con IA" : `${broken.length} fuentes no se pudieron analizar con IA`}</strong>{lastError && <small title={lastError}> · {lastError}</small>}</span>
+    <button onClick={() => void retry()} disabled={busy}>{busy ? <LoaderCircle className="spin" size={14} /> : <RefreshCw size={14} />} {busy ? "Reintentando…" : "Reintentar"}</button>
+    <button className="ghost" onClick={() => setDismissed(true)} aria-label="Ocultar aviso"><X size={14} /></button>
+  </div>;
 }
 
 function filterByScope(videos: AppVideo[], scope: Exclude<LibraryScope, null>) {
@@ -1616,7 +1650,7 @@ export function LuminaApp({ initialSurface = "home", initialConversationId = nul
           {!railOnly && !sidebarCollapsed && <button className="sidebar-resizer" onPointerDown={beginSidebarResize} aria-label="Cambiar ancho del panel izquierdo" title="Arrastra para cambiar el ancho" />}
         </div>
       </div>
-      {(surface === "home" || surface === "ask") && <KnowledgeHome key={`home-${surface}-${libraryScope}-${activeSpace?.id || ""}-${homeSearch.run}`} initialQuery={homeSearch.query} onSearchQuery={searchLibrary} spaces={data.spaces} activeSpace={activeSpace} onOpenSpace={openSpace} onDeleteSpace={(id) => void deleteSpace(id)} onSpaceCreated={(space) => void loadBootstrap().then(() => openSpace(space.id))} onClearSpace={goHome} scopeActive={libraryScope !== "all" && libraryScope !== null} onPreview={(id, sequence) => { setPreviewId(id); setPreviewSequence(sequence ?? []); }} onAskSource={askSource} profileId={data.profile.id} videos={homeVibe ? data.videos.filter((video) => homeVibe.ids.includes(video.id)) : activeSpace ? folderScopedVideos : visibleLibraryVideos} shelf={libraryScope === "all" && !activeTagIds.length ? data.videos.filter((video) => video.topPosition !== null && video.topPosition !== undefined).sort((a, b) => (a.topPosition ?? 0) - (b.topPosition ?? 0)) : []} vibe={homeVibe} onVibe={(video) => void openVibe(video)} onClearVibe={goHome} collections={data.collections} tags={data.tags} models={data.models} libraryNavigation={<LibraryScopeNavigation data={data} libraryScope={libraryScope} onLibraryScope={chooseLibraryScope} placement="top" pool={activeSpace ? folderVideos : undefined} />} initialTagId={activeTag} initialMode={surface === "ask" ? "ask" : "overview"} onModeChange={(mode) => { setSurface(mode === "ask" ? "ask" : "home"); const path = mode === "ask" ? "/?view=ask" : "/"; if (`${window.location.pathname}${window.location.search}` !== path) window.history.pushState({}, "", path); }} onAdd={() => setAddOpen(true)} onOpenVideo={openVideo} onOpenConversation={openConversation} onConversationChanged={() => void loadConversations()} onRefresh={async () => { await loadBootstrap(); }} />}
+      {(surface === "home" || surface === "ask") && <KnowledgeHome key={`home-${surface}-${libraryScope}-${activeSpace?.id || ""}-${homeSearch.run}`} initialQuery={homeSearch.query} onSearchQuery={searchLibrary} spaces={data.spaces} activeSpace={activeSpace} onOpenSpace={openSpace} onDeleteSpace={(id) => void deleteSpace(id)} onSpaceCreated={(space) => void loadBootstrap().then(() => openSpace(space.id))} onClearSpace={goHome} notice={surface === "home" ? <AiHealthBanner videos={data.videos} lastError={data.aiLastError || ""} onRetried={async () => { await loadBootstrap(); }} /> : null} scopeActive={libraryScope !== "all" && libraryScope !== null} onPreview={(id, sequence) => { setPreviewId(id); setPreviewSequence(sequence ?? []); }} onAskSource={askSource} profileId={data.profile.id} videos={homeVibe ? data.videos.filter((video) => homeVibe.ids.includes(video.id)) : activeSpace ? folderScopedVideos : visibleLibraryVideos} shelf={libraryScope === "all" && !activeTagIds.length ? data.videos.filter((video) => video.topPosition !== null && video.topPosition !== undefined).sort((a, b) => (a.topPosition ?? 0) - (b.topPosition ?? 0)) : []} vibe={homeVibe} onVibe={(video) => void openVibe(video)} onClearVibe={goHome} collections={data.collections} tags={data.tags} models={data.models} libraryNavigation={<LibraryScopeNavigation data={data} libraryScope={libraryScope} onLibraryScope={chooseLibraryScope} placement="top" pool={activeSpace ? folderVideos : undefined} />} initialTagId={activeTag} initialMode={surface === "ask" ? "ask" : "overview"} onModeChange={(mode) => { setSurface(mode === "ask" ? "ask" : "home"); const path = mode === "ask" ? "/?view=ask" : "/"; if (`${window.location.pathname}${window.location.search}` !== path) window.history.pushState({}, "", path); }} onAdd={() => setAddOpen(true)} onOpenVideo={openVideo} onOpenConversation={openConversation} onConversationChanged={() => void loadConversations()} onRefresh={async () => { await loadBootstrap(); }} />}
       {surface === "collection" && selectedCollection && <CollectionWorkspace key={selectedCollection.id} collection={selectedCollection} videos={collectionVideos} allVideos={data.videos} collections={data.collections} tags={data.tags} models={data.models} onOpenVideo={openLibrarySource} onOpenConversation={openConversation} onConversationChanged={() => void loadConversations()} onRefresh={async () => { await loadBootstrap(); }} onDeleted={() => { setActiveCollection(null); setSurface("home"); }} />}
       {surface === "graph" && <GraphWorkspace collections={data.collections} tags={data.tags} onOpenVideo={openLibrarySource} />}
       {surface === "learning" && <DailyReview videos={data.videos} catalog={data.tags} collections={data.collections} spaces={data.spaces} onChanged={async () => { await loadBootstrap(); }} onOpenVideo={openVideo} />}

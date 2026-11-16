@@ -3,4 +3,8 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   const { startMobileHttps } = await import("./lib/mobile-https");
   startMobileHttps();
+  if (process.env.LUMINA_DAILY_BACKUP !== "0") {
+    const { scheduleDailyBackups } = await import("./lib/backup");
+    scheduleDailyBackups();
+  }
 }

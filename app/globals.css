@@ -2702,3 +2702,10 @@ html[data-theme="dark"] .app-rail .rail-theme:hover { background: rgba(255,255,2
 /* «Lista y lector» con la misma cabecera que las demás vistas (antes ocultaba tipos y resultados). */
 .knowledge-home.view-reader .home-library-toolbar .library-scope-top { display: flex; margin: 0; }
 .knowledge-home.view-reader .home-library-toolbar .library-selection-head { display: flex; }
+
+/* Aviso cuando la IA no pudo analizar fuentes. */
+.ai-health-banner { display: flex; align-items: center; gap: 10px; margin: 0 0 16px; padding: 10px 12px 10px 14px; border: 1px solid #f0c9b9; border-radius: 12px; background: #fff6f1; color: #8a3a22; font-size: 13px; }
+.ai-health-banner > span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ai-health-banner small { color: #a8735f; }
+.ai-health-banner button { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 0; border-radius: 99px; background: var(--accent); color: #fff; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.ai-health-banner button.ghost { width: 30px; padding: 0; justify-content: center; background: transparent; color: #a8735f; }
