@@ -657,22 +657,6 @@ export function KnowledgeHome({ onClearSpace, scopeActive, profileId, videos, co
   const [cardSize, setCardSize] = useState<"l" | "m" | "s">("m");
   const [searchPanel, setSearchPanel] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  // Como en mymind: empezar a escribir en cualquier parte de la biblioteca lleva directo al buscador.
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey || event.altKey || event.key.length !== 1 || event.isComposing) return;
-      const target = event.target instanceof HTMLElement ? event.target : null;
-      if (target?.closest("input, textarea, select, [contenteditable='true'], [contenteditable='']")) return;
-      if (document.querySelector(".lv-modal, .modal-backdrop, .rail-popover, .lv-folder-menu")) return;
-      if (!searchInputRef.current || event.key === " ") return;
-      event.preventDefault();
-      searchInputRef.current.focus();
-      setQuery((current) => `${current}${event.key}`);
-      changeMode("overview");
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
   // Por defecto, bajo el buscador salen las carpetas; los tipos (Videos, Web…) solo al pulsar el buscador o si hay uno activo.
   const searchActive = searchPanel || Boolean(query.trim()) || Boolean(scopeActive);
   const [addMenu, setAddMenu] = useState(false);
@@ -695,6 +679,22 @@ export function KnowledgeHome({ onClearSpace, scopeActive, profileId, videos, co
     return () => window.clearTimeout(timer);
   }, [profileId]);
   const changeMode = (next: "overview" | "ask") => { setMode(next); onModeChange?.(next); };
+  // Como en mymind: empezar a escribir en cualquier parte de la biblioteca lleva directo al buscador.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey || event.key.length !== 1 || event.isComposing) return;
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      if (target?.closest("input, textarea, select, [contenteditable='true'], [contenteditable='']")) return;
+      if (document.querySelector(".lv-modal, .modal-backdrop, .rail-popover, .lv-folder-menu")) return;
+      if (!searchInputRef.current || event.key === " ") return;
+      event.preventDefault();
+      searchInputRef.current.focus();
+      setQuery((current) => `${current}${event.key}`);
+      changeMode("overview");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
   // Al escribir «#» se sugieren etiquetas, las más usadas primero (como en mymind).
   const tagFrequency = useMemo(() => {
     const counts = new Map<string, { name: string; count: number; level: string }>();
