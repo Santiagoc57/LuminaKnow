@@ -496,6 +496,7 @@ function SettingsModal({ bootstrap, onClose, onSaved }: { bootstrap: Bootstrap; 
           <div className="settings-actions"><button className="secondary-button" onClick={() => void generateExtensionToken()}><Puzzle size={16} />{extensionConnected ? "Generar un código nuevo" : "Vincular extensión"}</button>{extensionConnected && <button className="secondary-button danger-outline" onClick={() => void revokeExtension()}>Revocar conexión</button>}</div>
           <small className="extension-install-help">Firefox: abre <code>about:debugging</code> → Este Firefox → Cargar complemento temporal. Chrome: descomprime el ZIP y usa <code>chrome://extensions</code> → Cargar descomprimida.</small>
         </div>
+        <AppSection />
         <MobileSection />
         <MaintenanceSection report={bootstrap.maintenance} />
         <div className="settings-section">
@@ -618,6 +619,27 @@ type MaintenanceItem = { id: string; title: string; url: string; createdAt?: str
 type MobileStatus = { connected: boolean; appUrl: string; certUrl: string; https: { running: boolean; error: string; port: number; addresses: string[] } };
 
 // Celular Android: app instalable que aparece en «Compartir» y envía a esta Mac por la Wi-Fi de casa.
+// LUMINA como app: el icono en Aplicaciones y, si quieres, que arranque sola al iniciar sesión.
+function AppSection() {
+  const [state, setState] = useState<{ enabled: boolean; appInstalled: boolean } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => { void jsonRequest<{ enabled: boolean; appInstalled: boolean }>("/api/settings/autostart").then(setState).catch(() => setState(null)); }, []);
+  const toggle = async (enabled: boolean) => {
+    setBusy(true); setError("");
+    try { setState(await jsonRequest("/api/settings/autostart", { method: "POST", body: JSON.stringify({ enabled }) })); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "No se pudo cambiar."); }
+    finally { setBusy(false); }
+  };
+  return <div className="settings-section">
+    <h3>LUMINA como app</h3>
+    <p className="settings-help">{state?.appInstalled ? "Abre «LUMINA» desde Aplicaciones (o arrástrala al Dock): arranca sola si no está corriendo y se abre en su propia ventana, sin Terminal." : "La app aún no está instalada en Aplicaciones."}</p>
+    <label className="settings-check"><input type="checkbox" disabled={busy || !state} checked={Boolean(state?.enabled)} onChange={(event) => void toggle(event.target.checked)} /> Abrir LUMINA en segundo plano al iniciar sesión</label>
+    <small className="settings-help">Así tu celular y la extensión la encuentran aunque no hayas abierto la ventana. Puedes desactivarlo cuando quieras.</small>
+    {error && <p className="lv-error">{error}</p>}
+  </div>;
+}
+
 function MobileSection() {
   const [status, setStatus] = useState<MobileStatus | null>(null);
   const [code, setCode] = useState<{ code: string; expiresAt: string } | null>(null);
