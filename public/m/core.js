@@ -122,8 +122,10 @@
       try { data = await response.json(); } catch { data = {}; }
       if (response.ok) {
         await remove("queue", item.id);
+        // Si al compartir se eligió carpeta, se mete ahí en cuanto la Mac la recibe.
+        if (item.folderId && data.id) { try { await request("/api/mobile/action", token, { action: "folder", id: data.id, folderId: item.folderId }); } catch { /* se puede añadir luego */ } }
         const label = item.kind === "image" ? (item.title || (item.name || "").replace(/\.[a-z0-9]+$/i, "") || "Imagen") : item.kind === "url" ? (data.title || item.title || item.url) : item.text.slice(0, 80);
-        await add("sent", { kind: item.kind, label, luminaUrl: data.luminaUrl || "", sentAt: Date.now(), duplicate: Boolean(data.duplicate) });
+        await add("sent", { kind: item.kind, label, luminaId: data.id || "", luminaUrl: data.luminaUrl || "", sentAt: Date.now(), duplicate: Boolean(data.duplicate) });
         sent += 1;
       } else {
         await put("queue", { ...item, attempts: (item.attempts || 0) + 1, error: data.error || `Error ${response.status}` });
@@ -146,14 +148,15 @@
     if (op.action === "pin") item.pinned = true;
     if (op.action === "unpin") item.pinned = false;
     if (op.action === "note") item.note = op.content.trim() ? { content: op.content, updatedAt: item.note ? item.note.updatedAt : "" } : null;
+    if (op.action === "folder" && !item.folderIds.includes(op.folderId)) item.folderIds.push(op.folderId);
     await setMeta("library", library);
   }
 
   async function queueOp(op) {
     const ops = await list("ops");
     // Para la nota y los interruptores basta con el último cambio pendiente de cada fuente.
-    const family = (action) => action === "note" ? "note" : action.replace(/^un/, "");
-    const previous = ops.find((entry) => entry.itemId === op.itemId && family(entry.action) === family(op.action));
+    const family = (entry) => entry.action === "note" ? "note" : entry.action === "folder" ? `folder:${entry.folderId}` : entry.action.replace(/^un/, "");
+    const previous = ops.find((entry) => entry.itemId === op.itemId && family(entry) === family(op));
     if (previous) {
       await remove("ops", previous.id);
       if (op.action !== "note" && previous.action !== op.action) { await applyLocal(op); return; }
@@ -167,7 +170,7 @@
     const ops = (await list("ops")).sort((a, b) => a.id - b.id);
     for (const op of ops) {
       let response;
-      try { response = await request("/api/mobile/action", token, { action: op.action, id: op.itemId, content: op.content, baseUpdatedAt: op.baseUpdatedAt }); }
+      try { response = await request("/api/mobile/action", token, { action: op.action, id: op.itemId, content: op.content, baseUpdatedAt: op.baseUpdatedAt, folderId: op.folderId }); }
       catch { return "away"; }
       if (response.status === 401) return "revoked";
       // Aceptado, o la fuente ya no existe: en ambos casos sale de la lista. Otros errores se reintentan luego.
@@ -197,6 +200,7 @@
       if (op.action === "unconsume") item.consumedAt = null;
       if (op.action === "pin" || op.action === "unpin") item.pinned = op.action === "pin";
       if (op.action === "note") item.note = op.content.trim() ? { content: op.content, updatedAt: item.note ? item.note.updatedAt : "" } : null;
+      if (op.action === "folder" && !item.folderIds.includes(op.folderId)) item.folderIds.push(op.folderId);
     }
     await setMeta("library", library);
     await setMeta("libraryAt", Date.now());
@@ -233,6 +237,28 @@
   const getThumb = (id) => getOne("thumbs", id);
 
   // Al desvincular, la copia sale del celular.
+  // Preguntar a la Mac (a una fuente o a toda la biblioteca). Necesita estar en casa.
+  async function ask(question, id) {
+    const token = await getMeta("token");
+    if (!token) return { error: "Vincula el celular primero." };
+    try {
+      const response = await request("/api/mobile/ask", token, { question, id }, 120000);
+      const data = await response.json().catch(() => ({}));
+      return response.ok ? data : { error: data.error || "No se pudo responder." };
+    } catch { return { error: "Tu Mac no está al alcance. El chat funciona en casa." }; }
+  }
+
+  // Lo recién compartido va a una carpeta: lo que sigue en la bandeja se marca; lo ya enviado se añade como cambio.
+  async function sendRecentToFolder(count, folderId) {
+    const queued = (await list("queue")).sort((a, b) => b.id - a.id).slice(0, count);
+    for (const item of queued) await put("queue", { ...item, folderId });
+    const remaining = count - queued.length;
+    if (remaining > 0) {
+      const sent = (await list("sent")).filter((item) => item.luminaId).sort((a, b) => b.sentAt - a.sentAt).slice(0, remaining);
+      for (const item of sent) await queueOp({ action: "folder", itemId: item.luminaId, folderId });
+    }
+  }
+
   async function forget() {
     await setMeta("token", null);
     await setMeta("library", null);
@@ -254,5 +280,5 @@
     return flushing;
   }
 
-  scope.LuminaCore = { getMeta, setMeta, list, remove, put, enqueueShare, flush, ping, firstUrl, queueOp, syncLibrary, getThumb, onThumb, forget };
+  scope.LuminaCore = { getMeta, setMeta, list, remove, put, enqueueShare, flush, ping, firstUrl, queueOp, syncLibrary, getThumb, onThumb, forget, ask, sendRecentToFolder };
 })(self);

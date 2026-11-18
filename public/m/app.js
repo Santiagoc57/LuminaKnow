@@ -126,6 +126,7 @@
   function tabs(queueCount) {
     return `<nav class="tabs" role="tablist">
       <button role="tab" class="${view.tab === "library" ? "active" : ""}" data-tab="library" aria-selected="${view.tab === "library"}">Biblioteca</button>
+      <button role="tab" class="${view.tab === "ask" ? "active" : ""}" data-tab="ask" aria-selected="${view.tab === "ask"}">Preguntar</button>
       <button role="tab" class="${view.tab === "inbox" ? "active" : ""}" data-tab="inbox" aria-selected="${view.tab === "inbox"}">Bandeja${queueCount ? ` <span class="badge">${queueCount}</span>` : ""}</button>
     </nav>`;
   }
@@ -251,6 +252,11 @@
         ${item.takeaways.length ? `<section><h2>Para llevarte</h2>${list(item.takeaways)}</section>` : ""}
         ${item.imageText && !item.gist ? `<section><h2>En la imagen</h2><p>${escapeHtml(item.imageText)}</p></section>` : ""}
         ${item.highlights.length ? `<section><h2>Subrayados</h2>${item.highlights.map((h) => `<blockquote>${escapeHtml(h.quote)}${h.note ? `<small>${escapeHtml(h.note)}</small>` : ""}</blockquote>`).join("")}</section>` : ""}
+        ${library.folders.length ? `<section><h2>Carpetas</h2><div class="chips wrap">${library.folders.map((folder) => `<button class="chip${item.folderIds.includes(folder.id) ? " active" : ""}" data-add-folder="${escapeHtml(folder.id)}" ${item.folderIds.includes(folder.id) ? "disabled" : ""}><i style="border-color:${escapeHtml(folder.color)}"></i>${escapeHtml(folder.name)}</button>`).join("")}</div></section>` : ""}
+        <section><h2>Preguntar sobre esto</h2>
+          <form id="ask-item" class="ask-form"><textarea id="item-question" rows="2" placeholder="${connection.state === "online" ? "¿Cuál es la idea principal?" : "Disponible en casa"}" ${connection.state === "online" ? "" : "disabled"}></textarea><button ${connection.state === "online" ? "" : "disabled"}>Preguntar</button></form>
+          <div id="item-answer"></div>
+        </section>
         <section><h2>${item.type === "note" ? "Nota" : "Tus notas"}</h2>
           <textarea id="note" rows="${item.type === "note" ? 10 : 5}" placeholder="Escribe una nota…">${escapeHtml(item.note ? item.note.content : "")}</textarea>
           <div class="row"><button id="save-note" disabled>Guardar nota</button></div>
@@ -284,6 +290,23 @@
       toast(connection.state === "online" ? "Nota guardada" : "Nota guardada aquí · se enviará al volver a casa");
       void pushOps();
     });
+    sheet.querySelectorAll("[data-add-folder]").forEach((button) => button.addEventListener("click", async () => {
+      await core.queueOp({ action: "folder", itemId: item.id, folderId: button.dataset.addFolder });
+      await loadLocal();
+      renderDetail();
+      toast("Añadido a la carpeta");
+      void pushOps();
+    }));
+    document.getElementById("ask-item").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const field = document.getElementById("item-question");
+      const question = field.value.trim();
+      if (question.length < 2) return;
+      const target = document.getElementById("item-answer");
+      target.innerHTML = `<p class="muted">Pensando…</p>`;
+      const result = await core.ask(question, item.id);
+      target.innerHTML = result.error ? `<p class="error">${escapeHtml(result.error)}</p>` : `<div class="a">${answerHtml(result.content)}</div>`;
+    });
     sheet.querySelectorAll("[data-tag]").forEach((button) => button.addEventListener("click", () => {
       view.query = /\s/.test(button.dataset.tag) ? button.dataset.tag : `#${button.dataset.tag}`;
       view.folder = "all";
@@ -297,6 +320,78 @@
     if (connection.state !== "online") return;
     const result = await core.flush();
     if (result.state === "away") { connection = { state: "away" }; setStatus(); }
+  }
+
+  // ---------- Preguntar ----------
+
+  // Respuesta legible: párrafos, listas con guion y **negritas**, todo escapado.
+  function answerHtml(text) {
+    const inline = (line) => escapeHtml(line).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+    let html = "";
+    let list = false;
+    let paragraph = [];
+    const flush = () => { if (paragraph.length) { html += `<p>${paragraph.join("<br>")}</p>`; paragraph = []; } if (list) { html += "</ul>"; list = false; } };
+    for (const raw of String(text || "").split("\n")) {
+      const line = raw.trim();
+      if (!line) { flush(); continue; }
+      const heading = line.match(/^#{1,6}\s+(.*)$/);
+      if (heading) { flush(); html += `<h4>${inline(heading[1])}</h4>`; continue; }
+      const item = line.match(/^(?:[-•*]|\d+[.)])\s+(.*)$/);
+      if (item) { if (paragraph.length) { html += `<p>${paragraph.join("<br>")}</p>`; paragraph = []; } if (!list) { html += "<ul>"; list = true; } html += `<li>${inline(item[1])}</li>`; continue; }
+      if (list) { html += "</ul>"; list = false; }
+      paragraph.push(inline(line));
+    }
+    flush();
+    return html;
+  }
+  function sourcesHtml(sources) {
+    return sources && sources.length ? `<div class="answer-sources">${sources.map((source) => `<button class="chip" data-open="${escapeHtml(source.id)}">${escapeHtml(source.title.slice(0, 48))}</button>`).join("")}</div>` : "";
+  }
+  const chatLog = [];
+  let asking = false;
+  async function askLumina(question, id) {
+    asking = true;
+    const entry = { question, id, answer: null };
+    if (!id) chatLog.push(entry);
+    void render();
+    const result = await core.ask(question, id);
+    entry.answer = result;
+    asking = false;
+    return entry;
+  }
+  function askView(queueCount) {
+    app.innerHTML = `${tabs(queueCount)}
+      ${connection.state !== "online" ? `<div class="card empty">El chat lo responde tu Mac: funciona cuando estás en casa.</div>` : ""}
+      <div class="chat">${chatLog.length ? chatLog.map((entry) => `<div class="q">${escapeHtml(entry.question)}</div>${entry.answer ? entry.answer.error ? `<div class="a error">${escapeHtml(entry.answer.error)}</div>` : `<div class="a">${answerHtml(entry.answer.content)}${sourcesHtml(entry.answer.sources)}</div>` : `<div class="a muted">Buscando en tu biblioteca…</div>`}`).join("")
+        : `<div class="card empty">Pregunta a toda tu biblioteca. Te respondo con lo que has guardado y te muestro de dónde sale.</div>`}</div>
+      <form id="ask" class="ask-form"><textarea id="question" rows="2" placeholder="¿Qué he guardado sobre…?" ${asking ? "disabled" : ""}></textarea><button ${asking ? "disabled" : ""}>Preguntar</button></form>`;
+    bindTabs();
+    app.querySelectorAll("[data-open]").forEach((button) => button.addEventListener("click", () => openDetail(button.dataset.open)));
+    document.getElementById("ask").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const question = document.getElementById("question").value.trim();
+      if (question.length < 2 || asking) return;
+      await askLumina(question);
+      await render();
+    });
+  }
+
+  // Tras compartir: elegir carpeta para lo recién guardado (opcional).
+  function folderPicker(count) {
+    if (!library || !library.folders.length) return;
+    const bar = document.createElement("div");
+    bar.className = "folder-pick";
+    bar.innerHTML = `<p>¿A qué carpeta?</p><div class="chips">${library.folders.map((folder) => `<button class="chip" data-pick="${escapeHtml(folder.id)}"><i style="border-color:${escapeHtml(folder.color)}"></i>${escapeHtml(folder.name)}</button>`).join("")}</div><button class="link" data-skip>Sin carpeta</button>`;
+    document.body.appendChild(bar);
+    const close = () => bar.remove();
+    bar.querySelector("[data-skip]").addEventListener("click", close);
+    bar.querySelectorAll("[data-pick]").forEach((button) => button.addEventListener("click", async () => {
+      await core.sendRecentToFolder(count, button.dataset.pick);
+      close();
+      toast(`En «${library.folders.find((folder) => folder.id === button.dataset.pick).name}»`);
+      await sendNow();
+    }));
+    setTimeout(close, 20000);
   }
 
   // ---------- Bandeja ----------
@@ -380,6 +475,7 @@
     const queue = (await core.list("queue")).sort((a, b) => a.id - b.id);
     const revoked = connection.state === "revoked" ? `<section class="card"><p class="lead">Este celular ya no está vinculado.</p><p class="muted">Genera un código nuevo en tu Mac para volver a vincularlo. Lo que está en la bandeja se conserva.</p><div class="row" style="margin-top:12px"><button id="repair">Vincular de nuevo</button></div></section>` : "";
     if (view.tab === "inbox") await inboxView(queue);
+    else if (view.tab === "ask") askView(queue.length);
     else libraryView(queue.length);
     if (revoked) {
       app.insertAdjacentHTML("afterbegin", revoked);
@@ -395,7 +491,7 @@
     }
     const params = new URLSearchParams(location.search);
     const shared = Number(params.get("shared") || "0");
-    if (shared) { view.tab = "inbox"; toast(shared === 1 ? "Guardado en LUMINA" : `${shared} guardados en LUMINA`); }
+    if (shared) { view.tab = "inbox"; toast(shared === 1 ? "Guardado en LUMINA" : `${shared} guardados en LUMINA`); setTimeout(() => folderPicker(shared), 300); }
     if (location.search || location.hash) history.replaceState(null, "", "/m/index.html");
     await loadLocal();
     // Con copia guardada, la biblioteca aparece al instante y luego se actualiza.

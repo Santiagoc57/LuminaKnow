@@ -6,11 +6,13 @@ import { extensionError, extensionJson } from "@/lib/extension-http";
 import { syncRetrievalUnit } from "@/lib/knowledge";
 import { saveNoteContent } from "@/lib/notes";
 import { addToShelf, removeFromShelf } from "@/lib/shelf";
+import { addSpaceItem } from "@/lib/spaces";
 
 export const runtime = "nodejs";
 
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.enum(["consume", "unconsume", "pin", "unpin"]), id: z.string().min(1) }),
+  z.object({ action: z.literal("folder"), id: z.string().min(1), folderId: z.string().min(1) }),
   // baseUpdatedAt: la versión de la nota que tenía el celular. Si en el Mac cambió mientras tanto, no se pisa: se juntan las dos.
   z.object({ action: z.literal("note"), id: z.string().min(1), content: z.string().max(100_000), baseUpdatedAt: z.string().nullable().optional() }),
 ]);
@@ -28,6 +30,7 @@ export async function POST(request: Request) {
       return extensionJson(request, { ok: true });
     }
     if (body.action === "pin") { addToShelf(body.id); return extensionJson(request, { ok: true }); }
+    if (body.action === "folder") { addSpaceItem(body.folderId, body.id); return extensionJson(request, { ok: true }); }
     if (body.action !== "note") { removeFromShelf(body.id); return extensionJson(request, { ok: true }); }
     const current = db.prepare("SELECT content, updated_at AS updatedAt FROM notes WHERE video_id = ?").get(body.id) as { content: string; updatedAt: string } | undefined;
     let content = body.content;

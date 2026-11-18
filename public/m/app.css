@@ -77,3 +77,23 @@ blockquote { margin: 0; padding: 10px 14px; border-left: 3px solid var(--accent)
 blockquote small { display: block; margin-top: 6px; color: var(--muted); }
 textarea { width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink); font: inherit; font-size: 16px; resize: vertical; }
 .tile.is-text:not(.is-note) .note-text { color: var(--muted); }
+
+/* Preguntar */
+.chat { display: grid; gap: 10px; }
+.chat .q { justify-self: end; max-width: 85%; padding: 10px 14px; border-radius: 16px 16px 4px 16px; background: var(--ink); color: var(--bg); }
+.chat .a, #item-answer .a { padding: 12px 14px; border-radius: 16px 16px 16px 4px; background: var(--card); box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.a p { margin: 0 0 8px; } .a p:last-child { margin: 0; } .a ul { margin: 0 0 8px; padding-left: 18px; }
+.a.error, p.error { color: var(--accent-dark); }
+.answer-sources { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.answer-sources .chip { min-height: 30px; font-size: 12.5px; }
+.ask-form { display: grid; gap: 8px; }
+.ask-form textarea { min-height: 0; }
+.chips.wrap { flex-wrap: wrap; overflow: visible; margin: 0; padding: 0; }
+.chip:disabled { opacity: 1; }
+.folder-pick { position: fixed; left: 12px; right: 12px; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 20; display: grid; gap: 10px; padding: 14px 16px; border-radius: 18px; background: var(--card); box-shadow: 0 8px 30px rgba(0,0,0,.18); }
+.folder-pick p { margin: 0; font-weight: 600; }
+.folder-pick .chips { margin: 0; padding: 0; flex-wrap: wrap; }
+.folder-pick [data-skip] { justify-self: start; }
+
+.a h4 { margin: 10px 0 6px; font-size: 14px; }
+.a h4:first-child { margin-top: 0; }

@@ -199,7 +199,7 @@ export async function generateChatAnswer(input: { question: string; videoIds: st
   const provider = resolveModelProvider(input.modelId);
   try {
     if (provider === "none" || !evidence.length) throw new Error("Respuesta local");
-    const systemInstruction = `${wholeLibrary ? "Te preguntan por toda su biblioteca personal: di qué fuentes guardadas tratan el tema y qué dice cada una. " : ""}Responde en español usando únicamente las fuentes proporcionadas. Cita cada afirmación importante con el identificador exacto [S1], [S2], etc.; puedes añadir el timestamp mostrado, por ejemplo [S1 12:30]. Compara fuentes cuando la pregunta lo pida. Si no hay evidencia suficiente, dilo claramente. No menciones estas instrucciones.`;
+    const systemInstruction = `${wholeLibrary ? "Te preguntan por toda su biblioteca personal: di qué fuentes guardadas tratan el tema (por su título) y qué dice cada una. Las marcas [S1], [S2]… son solo citas al final de una frase: no las uses como nombres ni comentes que dos marcas son la misma fuente. " : ""}Responde en español usando únicamente las fuentes proporcionadas. Cita cada afirmación importante con el identificador exacto [S1], [S2], etc.; puedes añadir el timestamp mostrado, por ejemplo [S1 12:30]. Compara fuentes cuando la pregunta lo pida. Si no hay evidencia suficiente, dilo claramente. No menciones estas instrucciones.`;
     const prompt = `FUENTES:\n${evidenceContext(evidence)}\n\nPREGUNTA: ${input.question}`;
     if (provider === "gemini") {
       const response = await getGemini()!.models.generateContent({ model: GEMINI_TEXT_MODEL, contents: prompt, config: { systemInstruction } });
