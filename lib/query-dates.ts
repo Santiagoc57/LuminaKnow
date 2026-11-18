@@ -63,6 +63,8 @@ const RULES: Rule[] = [
     },
   },
   { pattern: `${MONTH_PATTERN} (?:de |del )?(\\d{4})`, range: (match) => monthRange(Number(match[2]), monthIndex(match[1])) },
+  // «en septiembre» sin año (el mes solo, «marzo», sigue siendo texto): el septiembre más reciente (este año si ya pasó o está en curso; si no, el anterior).
+  { pattern: `(?:en |del mes de )${MONTH_PATTERN}`, range: (match, now) => { const month = monthIndex(match[1]); return monthRange(month <= now.getMonth() ? now.getFullYear() : now.getFullYear() - 1, month); } },
 ];
 
 // Devuelve la búsqueda sin la frase de fecha. Lo que va entre comillas siempre es texto literal.

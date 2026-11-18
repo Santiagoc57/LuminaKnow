@@ -90,9 +90,40 @@ function parseTokens(tokens: string[], parsed = emptyQuery()) {
   return parsed;
 }
 
+const COLOR_WORDS: Record<string, string> = { rojo: "rojo", rojos: "rojo", roja: "rojo", rojas: "rojo", naranja: "naranja", naranjas: "naranja", amarillo: "amarillo", amarillos: "amarillo", amarilla: "amarillo", amarillas: "amarillo", verde: "verde", verdes: "verde", azul: "azul", azules: "azul", morado: "morado", morados: "morado", morada: "morado", moradas: "morado", rosa: "rosa", rosado: "rosa", rosados: "rosa", rosada: "rosa", negro: "negro", negros: "negro", negra: "negro", negras: "negro", blanco: "blanco", blancos: "blanco", blanca: "blanco", blancas: "blanco", gris: "gris", grises: "gris", marron: "marron", cafe: "marron" };
+const TYPE_WORDS = new Set(["captura", "capturas", "pantallazo", "pantallazos", "screenshot", "screenshots", "foto", "fotos", "imagen", "imagenes", "video", "videos", "nota", "notas", "pdf", "pdfs", "publicacion", "publicaciones", "tweet", "tweets", "articulo", "articulos", "pelicula", "peliculas", "producto", "productos", "paleta", "paletas", "cita", "citas"]);
+// Palabras de relleno al buscar como se habla («lo que guardé sobre…», «cosas en azul»): no son términos a buscar.
+const FILLER = new Set(["lo", "que", "guarde", "guardado", "guardados", "guardadas", "he", "mis", "mi", "cosas", "todo", "todas", "todos", "sobre", "con", "de", "del", "la", "las", "el", "los", "y", "un", "una", "unos", "unas", "en", "color", "colores", "tono", "tonos", "algo", "acerca"]);
+
+// Interpreta búsquedas en lenguaje natural sin operadores: «capturas con gráficos» → tipo:capturas gráficos;
+// «cosas en azul» → color:azul. Solo toca palabras sueltas (no entre comillas ni con operador).
+function naturalTokens(groups: string[][]) {
+  const singles = groups.filter((group) => group.length === 1).map((group) => group[0]);
+  const plain = (token: string) => !token.includes(":") && !token.startsWith("#") && !token.startsWith('"');
+  const words = singles.filter(plain).map(normalize);
+  const meaningful = words.filter((word) => !FILLER.has(word));
+  // Si la búsqueda es solo relleno (p. ej. «de la»), se deja como está.
+  if (!meaningful.length || meaningful.length === words.length && !meaningful.some((word) => TYPE_WORDS.has(word) || COLOR_WORDS[word])) return groups;
+  const hasType = singles.some((token) => /^(tipo|type):/i.test(token));
+  const hasColor = singles.some((token) => /^color:/i.test(token));
+  let typeTaken = hasType;
+  let colorTaken = hasColor;
+  const result: string[][] = [];
+  for (const group of groups) {
+    if (group.length !== 1 || !plain(group[0])) { result.push(group); continue; }
+    const word = normalize(group[0]);
+    if (FILLER.has(word)) continue;
+    if (!typeTaken && TYPE_WORDS.has(word)) { result.push([`tipo:${word}`]); typeTaken = true; continue; }
+    // Un color suelto puede ser el color de la imagen o una palabra del texto («Libro azul»): vale cualquiera de las dos.
+    if (!colorTaken && COLOR_WORDS[word]) { result.push([`color:${COLOR_WORDS[word]}`, group[0]]); colorTaken = true; continue; }
+    result.push(group);
+  }
+  return result;
+}
+
 export function parseLibraryQuery(input: string, now = new Date()): ParsedLibraryQuery {
   const { rest, range } = extractDateRange(input, now);
-  const groups = queryGroups(rest);
+  const groups = naturalTokens(queryGroups(rest));
   const parsed = parseTokens(groups.filter((group) => group.length === 1).map((group) => group[0]));
   parsed.dateRange = range;
   parsed.anyOf = groups.filter((group) => group.length > 1).map((group) => group.map((token) => parseTokens([token])));

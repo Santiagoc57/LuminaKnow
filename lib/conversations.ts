@@ -29,10 +29,8 @@ function requireKnownIds(table: "collections" | "tags" | "videos", ids: string[]
 }
 
 export function validateSourceSelection(input: ChatSourceSelection) {
+  // Sin fuentes elegidas = pregunta a toda la biblioteca.
   const selection = normalizeSelection(input);
-  if (!selection.collectionIds.length && !selection.tagIds.length && !selection.videoIds.length) {
-    throw new Error("Selecciona al menos una fuente antes de preguntar.");
-  }
   requireKnownIds("collections", selection.collectionIds, "colecciones");
   requireKnownIds("tags", selection.tagIds, "etiquetas");
   requireKnownIds("videos", [...new Set([...selection.videoIds, ...selection.excludedVideoIds])], "fuentes");
@@ -52,9 +50,15 @@ export function getConversationSelection(conversationId: string): ChatSourceSele
   return result;
 }
 
+export function isWholeLibrary(selection: ChatSourceSelection) {
+  return !selection.collectionIds.length && !selection.tagIds.length && !selection.videoIds.length;
+}
+
+// Devuelve [] cuando se pregunta a toda la biblioteca: la respuesta busca entonces en todas las fuentes listas.
 export function resolveEffectiveSources(selectionInput: ChatSourceSelection) {
   const selection = validateSourceSelection(selectionInput);
   const db = getDb();
+  if (isWholeLibrary(selection)) return [];
   const ids = new Set<string>();
   if (selection.collectionIds.length) {
     const rows = db.prepare(`WITH RECURSIVE selected_collections(id) AS (

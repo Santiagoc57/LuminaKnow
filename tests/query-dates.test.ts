@@ -92,3 +92,10 @@ test("tipo:captura reconoce capturas pero no portadas de páginas web", () => {
   assert.ok(!matches(source("dudosa", NOW, { sourceType: "image", ...visual(0.4) })));
   assert.ok(!matches(source("sin analizar", NOW, { sourceType: "image" })));
 });
+
+test("«en septiembre» sin año es el septiembre más reciente", () => {
+  const found = extractDateRange("lo que guardé en septiembre", NOW);
+  assert.ok(found.range, "debe reconocer la fecha");
+  assert.equal(new Date(found.range!.from).getMonth(), 8);
+  assert.ok(found.range!.from <= NOW.getTime());
+});
