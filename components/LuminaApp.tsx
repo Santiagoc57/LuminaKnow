@@ -4,7 +4,6 @@ import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Archive,
-  CalendarDays,
   ArrowUpRight,
   Bookmark,
   Check,
@@ -498,7 +497,7 @@ function SettingsModal({ bootstrap, onClose, onSaved }: { bootstrap: Bootstrap; 
           <small className="extension-install-help">Firefox: abre <code>about:debugging</code> → Este Firefox → Cargar complemento temporal. Chrome: descomprime el ZIP y usa <code>chrome://extensions</code> → Cargar descomprimida.</small>
         </div>
         <MobileSection />
-        <MaintenanceSection />
+        <MaintenanceSection report={bootstrap.maintenance} />
         <div className="settings-section">
           <h3>Tus datos</h3>
           <div className="settings-actions">
@@ -651,7 +650,7 @@ function MobileSection() {
   </div>;
 }
 
-function MaintenanceSection() {
+function MaintenanceSection({ report }: { report?: Bootstrap["maintenance"] }) {
   const [duplicates, setDuplicates] = useState<Array<{ reason: string; items: MaintenanceItem[] }> | null>(null);
   const [broken, setBroken] = useState<MaintenanceItem[] | null>(null);
   const [busy, setBusy] = useState("");
@@ -689,6 +688,7 @@ function MaintenanceSection() {
   </li>;
   return <div className="settings-section lv-maintenance">
     <h3>Mantenimiento</h3>
+    {report && <small className="lv-maint-report">Limpieza automática ({new Date(report.at).toLocaleDateString("es", { day: "numeric", month: "short" })}): {report.duplicates + report.broken + report.similarTags === 0 ? "todo en orden" : [report.duplicates && `${report.duplicates} duplicados`, report.broken && `${report.broken} enlaces rotos`, report.similarTags && `${report.similarTags} pares de etiquetas parecidas`].filter(Boolean).join(" · ")}{report.snapshots ? ` · ${report.snapshots} copias web guardadas` : ""}. Se revisa sola cada semana; nada se borra sin que lo decidas.</small>}
     <div className="settings-actions">
       <button className="secondary-button" disabled={Boolean(busy)} onClick={() => void findDuplicates()}>{busy === "dup" ? "Buscando…" : "Buscar duplicados"}</button>
       <button className="secondary-button" disabled={Boolean(busy)} onClick={() => void checkLinks()}>{busy === "links" ? "Revisando enlaces… (puede tardar)" : "Revisar enlaces rotos"}</button>
@@ -800,36 +800,6 @@ function AiIssuesPanel({ videos, lastError, onOpen, onRetried }: { videos: AppVi
 }
 
 // «Tu semana»: un resumen local (sin IA, sin costo) de lo que guardaste y de lo que conviene retomar.
-function WeekPanel({ videos, onOpen, onSearch, maintenance, onMaintenance }: { videos: AppVideo[]; onOpen: (id: string) => void; onSearch: (query: string) => void; maintenance?: Bootstrap["maintenance"]; onMaintenance?: () => void }) {
-  const [now] = useState(() => Date.now());
-  const day = 86_400_000;
-  const saved = videos.filter((video) => now - new Date(video.createdAt).getTime() < 7 * day);
-  const consumed = videos.filter((video) => video.consumedAt && now - new Date(video.consumedAt).getTime() < 7 * day);
-  const counts = new Map<string, number>();
-  saved.forEach((video) => video.tags.forEach((tag) => counts.set(tag.name, (counts.get(tag.name) ?? 0) + 1)));
-  const themes = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
-  // Lo guardado hace un año (± 2 semanas) y lo pendiente de hace más de 2 semanas, para retomarlo.
-  const yearAgo = videos.filter((video) => Math.abs(now - new Date(video.createdAt).getTime() - 365 * day) < 14 * day).slice(0, 2);
-  const pending = videos.filter((video) => !video.consumedAt && now - new Date(video.createdAt).getTime() > 14 * day && video.sourceType !== "note" && video.sourceType !== "image" && video.sourceType !== "palette")
-    .slice(0, 3);
-  const row = (video: AppVideo, note: string) => <li key={video.id}><button onClick={() => onOpen(video.id)}><span className="rail-list-thumb" style={video.thumbnailUrl ? { backgroundImage: `url(${video.thumbnailUrl})` } : undefined} /><span><strong>{video.title}</strong><small>{note}</small></span></button></li>;
-  return <div className="rail-list week-panel">
-    <header><strong>Tu semana</strong><small>{saved.length === 1 ? "Guardaste 1 cosa" : `Guardaste ${saved.length} cosas`}{consumed.length ? ` y terminaste ${consumed.length}` : ""} en los últimos 7 días.</small></header>
-    {themes.length > 0 && <div className="week-themes">{themes.map(([name, count]) => <button key={name} onClick={() => onSearch(`#${name.replace(/\s+/g, "-")}`)}>{name}<b>{count}</b></button>)}</div>}
-    {yearAgo.length > 0 && <><h4>Hace un año</h4><ul>{yearAgo.map((video) => row(video, new Date(video.createdAt).toLocaleDateString("es", { day: "numeric", month: "long", year: "numeric" })))}</ul></>}
-    {pending.length > 0 && <><h4>Para retomar</h4><ul>{pending.map((video) => row(video, `Guardado ${new Date(video.createdAt).toLocaleDateString("es", { day: "numeric", month: "short" })} · sin ver`))}</ul></>}
-    {!saved.length && !yearAgo.length && !pending.length && <p className="rail-list-empty">Esta semana ha estado tranquila.</p>}
-    {maintenance && <><h4>Limpieza de la semana</h4><div className="week-maintenance">
-      {maintenance.duplicates + maintenance.broken + maintenance.similarTags === 0
-        ? <p>Todo en orden: sin duplicados, enlaces rotos ni etiquetas repetidas{maintenance.snapshots ? ` · ${maintenance.snapshots} copias web guardadas` : ""}.</p>
-        : <p>{[maintenance.duplicates && `${maintenance.duplicates} ${maintenance.duplicates === 1 ? "grupo duplicado" : "grupos duplicados"}`, maintenance.broken && `${maintenance.broken} ${maintenance.broken === 1 ? "enlace roto" : "enlaces rotos"}`, maintenance.similarTags && `${maintenance.similarTags} ${maintenance.similarTags === 1 ? "par de etiquetas parecidas" : "pares de etiquetas parecidas"}`].filter(Boolean).join(" · ")}{maintenance.snapshots ? ` · ${maintenance.snapshots} copias web guardadas` : ""}.</p>}
-      <small>Revisado {new Date(maintenance.at).toLocaleDateString("es", { weekday: "long", day: "numeric", month: "short" })}. No se borra nada solo.</small>
-      {maintenance.duplicates + maintenance.broken + maintenance.similarTags > 0 && onMaintenance && <button onClick={onMaintenance}>Revisar en Mantenimiento</button>}
-    </div></>}
-  </div>;
-}
-
-// «En mente»: lo que fijaste con el alfiler, como una carpeta temporal siempre a mano.
 function ShelfPanel({ videos, onOpen }: { videos: AppVideo[]; onOpen: (id: string) => void }) {
   return <div className="rail-list">
     <header><strong>En mente</strong><small>Lo que fijaste con el alfiler, a mano mientras lo necesites.</small></header>
@@ -1205,7 +1175,7 @@ export function LuminaApp({ initialSurface = "home", initialConversationId = nul
       <button className="mobile-menu" onClick={() => setMobileSidebar(true)} aria-label="Abrir biblioteca"><Menu size={20} /></button>
       <div className={mobileSidebar ? "mobile-sidebar-wrap open" : "mobile-sidebar-wrap"} onMouseDown={(event) => event.target === event.currentTarget && setMobileSidebar(false)}>
         <div className="navigation-shell">
-          <AppRail data={data} surface={surface} sidebarCollapsed={sidebarCollapsed} onAdd={() => setAddOpen(true)} onHome={goLogo} onChat={() => newChat()} onGraph={goGraph} onLearning={goLearning} onSpaces={goSpaces} onSerendipity={goSerendipity} onToggleSidebar={toggleSidebar} onSettings={() => setSettingsOpen(true)} onLogout={() => void logout()} panels={[{ key: "week", label: "Tu semana", icon: <CalendarDays size={19} />, render: (close) => <WeekPanel videos={data.videos} maintenance={data.maintenance} onMaintenance={() => { close(); setSettingsOpen(true); }} onOpen={(id) => { close(); setPreviewId(id); }} onSearch={(query) => { close(); searchLibrary(query); }} /> }, { key: "shelf", label: "En mente", icon: <Pin size={19} />, render: (close) => <ShelfPanel videos={data.videos.filter((video) => video.topPosition !== null && video.topPosition !== undefined).sort((a, b) => (a.topPosition ?? 0) - (b.topPosition ?? 0))} onOpen={(id) => { close(); setPreviewId(id); }} /> }, ...(brokenSources(data.videos).length ? [{ key: "issues", label: "Fuentes sin analizar", tone: "alert" as const, badge: brokenSources(data.videos).length, icon: <CircleAlert size={19} />, render: (close: () => void) => <AiIssuesPanel videos={brokenSources(data.videos)} lastError={data.aiLastError || ""} onOpen={(id) => { close(); setPreviewId(id); }} onRetried={async () => { await loadBootstrap(); }} /> }] : [])]} tagsActive={activeTagIds.length > 0} tagPanel={(close) => <CanonicalTagNavigation data={data} selectedIds={activeTagIds} open onToggleOpen={close} onChange={(ids) => { setActiveTagIds(ids); setLibraryScope("all"); setSurface("home"); setSelectedId(null); setActiveCollection(null); setActiveSpaceId(null); }} onMigrate={() => { close(); setTaxonomyMigrationOpen(true); }} />} />
+          <AppRail data={data} surface={surface} sidebarCollapsed={sidebarCollapsed} onAdd={() => setAddOpen(true)} onHome={goLogo} onChat={() => newChat()} onGraph={goGraph} onLearning={goLearning} onSpaces={goSpaces} onSerendipity={goSerendipity} onToggleSidebar={toggleSidebar} onSettings={() => setSettingsOpen(true)} onLogout={() => void logout()} panels={[{ key: "shelf", label: "En mente", icon: <Pin size={19} />, render: (close) => <ShelfPanel videos={data.videos.filter((video) => video.topPosition !== null && video.topPosition !== undefined).sort((a, b) => (a.topPosition ?? 0) - (b.topPosition ?? 0))} onOpen={(id) => { close(); setPreviewId(id); }} /> }, ...(brokenSources(data.videos).length ? [{ key: "issues", label: "Fuentes sin analizar", tone: "alert" as const, badge: brokenSources(data.videos).length, icon: <CircleAlert size={19} />, render: (close: () => void) => <AiIssuesPanel videos={brokenSources(data.videos)} lastError={data.aiLastError || ""} onOpen={(id) => { close(); setPreviewId(id); }} onRetried={async () => { await loadBootstrap(); }} /> }] : [])]} tagsActive={activeTagIds.length > 0} tagPanel={(close) => <CanonicalTagNavigation data={data} selectedIds={activeTagIds} open onToggleOpen={close} onChange={(ids) => { setActiveTagIds(ids); setLibraryScope("all"); setSurface("home"); setSelectedId(null); setActiveCollection(null); setActiveSpaceId(null); }} onMigrate={() => { close(); setTaxonomyMigrationOpen(true); }} />} />
           {!sidebarCollapsed && (surface === "chat" ? <ChatHistorySidebar conversations={conversations} activeId={activeConversationId} onNew={() => newChat()} onOpen={openConversation} onRename={async (id, title) => { await jsonRequest(`/api/conversations/${id}`, { method: "PATCH", body: JSON.stringify({ title }) }); await loadConversations(); }} onPin={async (id, pinned) => { await jsonRequest(`/api/conversations/${id}`, { method: "PATCH", body: JSON.stringify({ pinned }) }); await loadConversations(); }} onDelete={async (id) => { if (!window.confirm("¿Eliminar esta conversación? Las fuentes se conservarán.")) return; await jsonRequest(`/api/conversations/${id}`, { method: "DELETE" }); const remaining = await loadConversations(); if (id === activeConversationId) { if (remaining[0]) openConversation(remaining[0].id); else newChat(); } }} /> : null)}
           {!railOnly && !sidebarCollapsed && <button className="sidebar-resizer" onPointerDown={beginSidebarResize} aria-label="Cambiar ancho del panel izquierdo" title="Arrastra para cambiar el ancho" />}
         </div>
