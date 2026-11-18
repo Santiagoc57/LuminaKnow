@@ -671,6 +671,15 @@ function MaintenanceSection() {
   };
   const saveCopies = async () => { setBusy("copies"); try { const result = await jsonRequest<{ saved: number; pending: number }>("/api/maintenance", { method: "POST", body: JSON.stringify({ action: "snapshots" }) }); setCopies(result.saved ? `Copias guardadas: ${result.saved}.${result.pending ? ` ${result.pending} páginas no respondieron.` : ""}` : result.pending ? `${result.pending} páginas no respondieron.` : "Todas las webs ya tenían copia."); } finally { setBusy(""); } };
   const archive = async (id: string) => { await jsonRequest(`/api/videos/${id}`, { method: "PATCH", body: JSON.stringify({ action: "archive" }) }); setArchived((current) => new Set([...current, id])); };
+  type TagSide = { id: string; name: string; uses: number; catalog: boolean };
+  const [similar, setSimilar] = useState<Array<{ keep: TagSide; merge: TagSide; reason: string; done?: string }> | null>(null);
+  const findSimilar = async () => { setBusy("tags"); try { setSimilar((await jsonRequest<{ pairs: NonNullable<typeof similar> }>("/api/maintenance", { method: "POST", body: JSON.stringify({ action: "similar-tags" }) })).pairs); } finally { setBusy(""); } };
+  // Une «merge» en «keep»; el botón ⇄ invierte cuál se conserva (salvo si la otra es del catálogo).
+  const mergePair = async (index: number, keep: TagSide, merge: TagSide) => {
+    await jsonRequest("/api/maintenance", { method: "POST", body: JSON.stringify({ action: "merge-tags", keepId: keep.id, mergeId: merge.id }) });
+    setSimilar((current) => current?.map((pair, i) => i === index ? { ...pair, done: `Unidas en «${keep.name}»` } : pair) ?? null);
+  };
+  const swapPair = (index: number) => setSimilar((current) => current?.map((pair, i) => i === index && !pair.keep.catalog ? { ...pair, keep: pair.merge, merge: pair.keep } : pair) ?? null);
   const row = (item: MaintenanceItem, extra?: React.ReactNode) => <li key={item.id} className={archived.has(item.id) ? "done" : ""}>
     <a href={`/?video=${encodeURIComponent(item.id)}`}>{item.title || item.url}</a>
     <small>{item.createdAt ? new Date(item.createdAt).toLocaleDateString("es") : item.url.replace(/^https?:\/\//, "").slice(0, 48)}</small>
@@ -684,7 +693,13 @@ function MaintenanceSection() {
       <button className="secondary-button" disabled={Boolean(busy)} onClick={() => void checkLinks()}>{busy === "links" ? "Revisando enlaces… (puede tardar)" : "Revisar enlaces rotos"}</button>
       <button className="secondary-button" disabled={Boolean(busy) || Boolean(retag?.running)} onClick={() => void startRetag()}>{retag?.running ? `Reetiquetando… ${retag.done}/${retag.total}` : "Reetiquetar con IA"}</button>
       <button className="secondary-button" disabled={Boolean(busy)} onClick={() => void saveCopies()}>{busy === "copies" ? "Guardando copias…" : "Guardar copias de las webs"}</button>
+      <button className="secondary-button" disabled={Boolean(busy)} onClick={() => void findSimilar()}>{busy === "tags" ? "Buscando…" : "Etiquetas parecidas"}</button>
     </div>
+    {similar && (similar.length ? <div className="lv-maint-group"><strong>Etiquetas que dicen casi lo mismo</strong><ul>{similar.map((pair, index) => <li key={`${pair.keep.id}-${pair.merge.id}`} className={pair.done ? "done" : ""}>
+      <span>«{pair.merge.name}» <small>({pair.merge.uses})</small> → «{pair.keep.name}»{pair.keep.catalog ? " ◆" : ""} <small>({pair.keep.uses})</small></span>
+      <small>{pair.reason}</small>
+      {pair.done ? <span>{pair.done}</span> : <>{!pair.keep.catalog && !pair.merge.catalog && <button className="secondary-button" title="Conservar la otra" aria-label="Conservar la otra" onClick={() => swapPair(index)}>⇄</button>}<button className="secondary-button" onClick={() => void mergePair(index, pair.keep, pair.merge)}>Unir</button></>}
+    </li>)}</ul></div> : <small>No hay etiquetas parecidas.</small>)}
     {copies && <small>{copies}</small>}
     {retag && !retag.running && <small>Reetiquetado: {retag.total} fuentes revisadas, {retag.changed} con etiquetas nuevas{retag.failed ? `, ${retag.failed} sin respuesta de la IA` : ""}.</small>}
     {duplicates && (duplicates.length ? duplicates.map((group, index) => <div key={index} className="lv-maint-group"><strong>{group.reason}</strong><ul>{group.items.map((item) => row(item))}</ul></div>) : <small>No hay duplicados.</small>)}

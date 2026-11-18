@@ -930,6 +930,7 @@ html[data-theme="dark"] .lv-audio-stage { background: var(--card, hsl(0 0% 20%))
 html[data-theme="dark"] .lv-audio-stage > img, html[data-theme="dark"] .lv-audio-art { background: hsl(40 4% 15%); color: hsl(39 6% 71%); }
 html[data-theme="dark"] .lv-audio-stage p { color: hsl(39 6% 71%); }
 html[data-theme="dark"] .lv-audio-open { background: hsl(45 2% 32%); }
+html[data-theme="dark"] .lv-folder-suggest { border: 1px dashed hsl(39 3% 22%); color: hsl(39 6% 71%); }
 
 /* «ESC para cerrar» va sobre el fondo oscuro del modal: blanco también en modo oscuro. */
 html[data-theme="dark"] .lv-modal-esc { color: rgba(255,255,255,.82); }

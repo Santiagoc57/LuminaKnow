@@ -2773,3 +2773,13 @@ html[data-theme="dark"] .app-rail .rail-theme:hover { background: rgba(255,255,2
 .lv-audio-time { display: inline-block; min-width: 46px; color: #e75e3a; font-variant-numeric: tabular-nums; font-size: 12.5px; }
 .lv-audio .lv-tldw { margin-top: 18px; }
 @media (max-width: 700px) { .lv-audio-stage { flex-direction: column; align-items: flex-start; } }
+
+/* Carpeta sugerida */
+.lv-folder-suggest { display: inline-flex; align-items: center; height: 32px; border: 1px dashed #d8d3ca; border-radius: 99px; color: #8d887f; font-size: 13px; }
+.lv-folder-suggest { max-width: 180px; }
+.lv-folder-suggest button:first-child { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; display: block !important; line-height: 30px; }
+.lv-folder-suggest button:first-child svg { vertical-align: -2px; margin-right: 4px; }
+.lv-folder-suggest button { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 2px 0 10px; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.lv-folder-suggest button small { color: #b3ada3; }
+.lv-folder-suggest button:hover { color: var(--accent); }
+.lv-folder-suggest .lv-folder-suggest-x { padding: 0 10px 0 4px; }

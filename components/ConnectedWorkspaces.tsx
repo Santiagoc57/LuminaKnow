@@ -622,6 +622,7 @@ export function KnowledgeHome({ onClearSpace, scopeActive, profileId, videos, co
 }) {
   const [mode, setMode] = useState<"overview" | "ask">(initialMode);
   const [view, setView] = useState<HomeView>("mosaic");
+  const [dismissedSuggestions, setDismissedSuggestions] = useState<string[]>(() => { try { return JSON.parse(window.localStorage.getItem("lumina-folder-suggestions-dismissed") || "[]"); } catch { return []; } });
   const [savingSpace, setSavingSpace] = useState(false);
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [folderMenuId, setFolderMenuId] = useState<string | null>(null);
@@ -962,6 +963,22 @@ export function KnowledgeHome({ onClearSpace, scopeActive, profileId, videos, co
   const renderedGithubSources = githubSources.filter((video) => renderedIds.has(video.id));
   const renderedWebSources = webSources.filter((video) => renderedIds.has(video.id));
   const shownView: HomeView = vibe ? "mosaic" : view;
+  // Carpeta sugerida: el tema con más fuentes (4 o más) que aún no tiene carpeta. Se crea con su regla y se llena sola.
+  const folderSuggestion = (() => {
+    if (activeSpace || vibe) return null;
+    const counts = new Map<string, number>();
+    for (const video of videos) for (const tag of video.tags) counts.set(tag.name, (counts.get(tag.name) ?? 0) + 1);
+    const taken = (name: string) => (spaces ?? []).some((space) => fold(space.name) === fold(name) || fold(space.query).includes(`#${fold(name).replaceAll(" ", "-")}`));
+    const best = [...counts].filter(([name, count]) => count >= 4 && !taken(name) && !dismissedSuggestions.includes(name)).sort((a, b) => b[1] - a[1])[0];
+    return best ? { name: best[0], count: best[1] } : null;
+  })();
+  const dismissSuggestion = (name: string) => { const next = [...dismissedSuggestions, name]; setDismissedSuggestions(next); try { window.localStorage.setItem("lumina-folder-suggestions-dismissed", JSON.stringify(next)); } catch { /* sin almacenamiento */ } };
+  async function createSuggestedFolder(name: string) {
+    try {
+      const { space } = await readJson<{ space: SmartSpace }>("/api/spaces", { method: "POST", body: JSON.stringify({ name, query: `#${name.replaceAll(" ", "-")}` }) });
+      onSpaceCreated?.(space);
+    } catch (cause) { window.alert(cause instanceof Error ? cause.message : "No se pudo crear la carpeta."); }
+  }
   const renderSourceCard = (video: AppVideo) => {
     const opensInternally = video.sourceType === "youtube" || (video.sourceType === "web" && isSubstackSource(video));
     return <HomeVideoCard key={video.id} video={video} collections={collections} tags={tags} selected={selection.has(video.id)} onTagFilter={(tagId) => { setTagFilter(tagId); changeMode("overview"); }} onToggleSelection={() => setSelectedIds((current) => current.includes(video.id) ? current.filter((id) => id !== video.id) : [...current, video.id])} onOpen={() => onPreview ? onPreview(video.id) : opensInternally ? onOpenVideo(video.id) : window.open(video.url, "_blank", "noopener,noreferrer")} onChanged={onRefresh} />;
@@ -1007,6 +1024,7 @@ export function KnowledgeHome({ onClearSpace, scopeActive, profileId, videos, co
           </div></>}
         </span>)}
         <button className="lv-folder-new" onClick={() => setNewFolderOpen(true)} title="Nueva carpeta" aria-label="Nueva carpeta"><Plus size={14} /></button>
+        {folderSuggestion && <span className="lv-folder-suggest"><button onClick={() => void createSuggestedFolder(folderSuggestion.name)} title={`Crear la carpeta «${folderSuggestion.name}»: se llena sola con todo lo etiquetado así`}><Sparkles size={13} /> {folderSuggestion.name} <small>{folderSuggestion.count}</small></button><button className="lv-folder-suggest-x" onClick={() => dismissSuggestion(folderSuggestion.name)} title="No sugerir esta carpeta" aria-label="No sugerir esta carpeta"><X size={12} /></button></span>}
       </div>}
       </div>
       <div className="library-selection-head"><button onClick={() => setSelectedIds(selectedIds.length === filteredVideos.length ? [] : filteredVideos.map((video) => video.id))}><CheckSquare size={15} />{selectedIds.length === filteredVideos.length && filteredVideos.length ? "Quitar selección" : "Seleccionar todo"}</button><span className="lv-results-meta">{!vibe && !activeSpace && topBoards.length > 0 && <button className={`lv-board-tabs-all ${boardsOpen ? "active" : ""}`} onClick={() => setBoardsOpen((current) => !current)} aria-pressed={boardsOpen}><LayoutGrid size={13} /> Tableros</button>}<label className="lv-date-filter"><CalendarDays size={13} /><select aria-label="Fecha" value={dateFilter} onChange={(event) => setDateFilter(event.target.value as typeof dateFilter)}><option value="all">Cualquier fecha</option><option value="today">Hoy</option><option value="week">Últimos 7 días</option><option value="month">Últimos 30 días</option><option value="year">Este año</option></select></label>{shownView === "mosaic" && <span className="lv-card-size" role="radiogroup" aria-label="Tamaño de las tarjetas">{([["l", "Tarjetas grandes", 2], ["m", "Tarjetas medianas", 3], ["s", "Tarjetas pequeñas", 4]] as const).map(([size, label, cells]) => <button key={size} role="radio" aria-checked={cardSize === size} className={cardSize === size ? "active" : ""} title={label} aria-label={label} onClick={() => changeCardSize(size)}><i style={{ gridTemplateColumns: `repeat(${cells}, 1fr)` }}>{Array.from({ length: cells * cells }, (_, index) => <b key={index} />)}</i></button>)}</span>}{filteredVideos.length} resultados{semanticOnly > 0 && <em className="lv-semantic-count" title="Encontrados por significado aunque no contengan esas palabras"> · {semanticOnly} por significado</em>}</span></div>
