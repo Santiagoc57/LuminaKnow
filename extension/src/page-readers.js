@@ -144,5 +144,38 @@
     return null;
   }
 
-  root.LuminaPage = { readStructuredPage, readRedditComment, readTweet };
+  // ---------- Facebook ----------
+  // Facebook cambia sus clases a menudo: se usan roles, enlaces y textos, que son más estables.
+  const FB_PERMALINK = /\/(posts|permalink|videos|reel|photo|photos|watch|story\.php|groups\/[^/]+\/posts|share\/p)\b|story_fbid=|fbid=/;
+  function facebookPermalink(article) {
+    const anchors = [...article.querySelectorAll("a[href]")].map((anchor) => absolute(anchor.getAttribute("href"))).filter((href) => /facebook\.com/.test(href) && FB_PERMALINK.test(href));
+    const href = anchors[0] || "";
+    if (!href) return "";
+    try {
+      const url = new URL(href);
+      // Solo se conservan los parámetros que identifican la publicación (no el rastreo).
+      const keep = new URLSearchParams();
+      ["story_fbid", "id", "fbid", "v", "set"].forEach((key) => { if (url.searchParams.has(key)) keep.set(key, url.searchParams.get(key)); });
+      url.search = keep.toString();
+      url.hash = "";
+      return url.href;
+    } catch { return ""; }
+  }
+  function readFacebookPost(article) {
+    if (!article) return null;
+    const url = facebookPermalink(article) || (/\/(posts|permalink|videos|reel|photo)/.test(location.pathname) ? location.href.split("#")[0] : "");
+    if (!url) return null;
+    const author = clean(article.querySelector("h2 a, h3 a, h4 a, strong a, h2 span, h3 span")?.innerText || "").split("\n")[0];
+    const message = article.querySelector('[data-ad-preview="message"], [data-ad-comet-preview="message"], [data-ad-rendering-role="story_message"]');
+    // Sin el marcador del mensaje: el bloque de texto más largo que no sea un comentario.
+    const blocks = message ? [message] : [...article.querySelectorAll('div[dir="auto"]')].filter((block) => !block.closest('[role="article"] [role="article"]') && !block.closest("ul"));
+    const text = clean(blocks.map((block) => block.innerText).sort((a, b) => b.length - a.length)[0] || "");
+    const photos = [...article.querySelectorAll("img")].filter((image) => { const rect = image.getBoundingClientRect(); return rect.width >= 200 && rect.height >= 120 && /scontent|fbcdn/.test(image.currentSrc || image.src); }).map((image) => httpUrl(image.currentSrc || image.src)).filter(Boolean);
+    if (!text && !photos.length) return null;
+    const firstLine = text.split("\n").find(Boolean) || `Publicación de ${author || "Facebook"}`;
+    const item = { externalId: (url.match(/(?:story_fbid=|fbid=|posts\/|videos\/|reel\/)(\w+)/) || [])[1] || "", url, authorName: author, authorHandle: "", avatarUrl: "", text, publishedAt: "", previewUrl: photos[0] || "", depth: 0 };
+    return { kind: "facebook-post", url, title: firstLine.length > 110 ? `${firstLine.slice(0, 107).trim()}…` : firstLine, channel: author, description: text.slice(0, 3_000), imageUrl: photos[0] || "", publishedAt: "", items: [item] };
+  }
+
+  root.LuminaPage = { readStructuredPage, readRedditComment, readTweet, readFacebookPost };
 })(globalThis);

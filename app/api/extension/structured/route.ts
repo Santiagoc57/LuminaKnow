@@ -7,7 +7,7 @@ import { assignEarlyTags } from "@/lib/early-tags";
 import { validateCatalogAssignment } from "@/lib/canonical-tags";
 import { createHighlight } from "@/lib/highlights";
 import { createQuoteFromClip } from "@/lib/notes";
-import { makeId, parseRedditUrl, parseXUrl } from "@/lib/utils";
+import { makeId, parseRedditUrl, parseWebUrl, parseXUrl } from "@/lib/utils";
 import { scheduleJob } from "@/lib/worker";
 
 export const runtime = "nodejs";
@@ -27,7 +27,7 @@ const itemSchema = z.object({
   depth: z.number().int().min(0).max(30).catch(0),
 });
 const schema = z.object({
-  kind: z.enum(["reddit-thread", "reddit-comment", "tweet", "x-thread"]),
+  kind: z.enum(["reddit-thread", "reddit-comment", "tweet", "x-thread", "facebook-post"]),
   url: z.string().trim().url(),
   title: text(300),
   channel: text(200),
@@ -43,6 +43,12 @@ const schema = z.object({
 });
 
 function identity(data: z.infer<typeof schema>) {
+  if (data.kind === "facebook-post") {
+    // Facebook no deja leer publicaciones desde el servidor: se guarda lo que la extensión leyó, como página social.
+    const page = parseWebUrl(data.url);
+    if (!page || !/(^|\.)facebook\.com$/.test(new URL(page.url).hostname)) throw new Error("No se reconoció la publicación de Facebook.");
+    return { sourceType: "web" as const, sourceId: page.pageId, url: page.url };
+  }
   if (data.kind === "tweet" || data.kind === "x-thread") {
     const post = parseXUrl(data.url);
     if (!post) throw new Error("No se reconoció la publicación de X.");

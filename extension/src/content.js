@@ -16,6 +16,13 @@
   const isX = host === "x.com" || host === "twitter.com";
   const isReddit = /(^|\.)reddit\.com$/.test(host);
   const isInstagram = host === "instagram.com" || host.endsWith(".instagram.com");
+  const isFacebook = host === "facebook.com" || host.endsWith(".facebook.com");
+  // En Facebook las publicaciones son role="article" (los comentarios también, dentro): se toma la más externa.
+  function facebookArticle(element) {
+    let article = element.closest('[role="article"]');
+    while (article && article.parentElement && article.parentElement.closest('[role="article"]')) article = article.parentElement.closest('[role="article"]');
+    return article;
+  }
   function mark() {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("viewBox", "0 0 24 24");
@@ -44,6 +51,7 @@
     .float svg { width: 18px; height: 18px; }
     .float.busy { opacity: .7; cursor: progress; }
     .float.done { background: #2b2723; }
+    .float:not(.gallery-float) { width: 32px; padding: 0; justify-content: center; background: rgba(231, 94, 58, .92); }
     .picker { position: fixed; width: 300px; max-height: min(520px, calc(100vh - 24px)); display: none; flex-direction: column; overflow: hidden; border-radius: 18px; background: #fff; color: #2b2723; box-shadow: 0 12px 40px rgba(0,0,0,.28); pointer-events: auto; font-size: 13px; }
     .picker.show { display: flex; }
     .picker header { padding: 14px 14px 6px; display: grid; grid-template-columns: 22px 1fr 22px; align-items: center; }
@@ -102,7 +110,7 @@
   let toastTimer = 0;
 
   function label(target) {
-    return target.kind === "image" ? "Guardar imagen" : target.kind === "comment" ? "Guardar comentario" : target.kind === "video" ? "Guardar video" : "Guardar";
+    return target.kind === "image" ? "Guardar imagen" : target.kind === "facebook" ? "Guardar publicación" : target.kind === "comment" ? "Guardar comentario" : target.kind === "video" ? "Guardar video" : "Guardar";
   }
 
   // Instagram: si la imagen es parte de un carrusel, aparece también «Galería» para guardar todas las fotos.
@@ -120,18 +128,18 @@
       galleryFloating.className = "float gallery-float show";
       galleryFloating.replaceChildren(mark(), textNode("span", "Galería"));
       galleryFloating.title = "Guardar todas las fotos del carrusel en Lúmina";
-      galleryFloating.style.top = `${Math.max(6, Math.min(window.innerHeight - 38, rect.top + 10))}px`;
-      galleryFloating.style.left = `${Math.max(6, Math.min(window.innerWidth - 110, rect.left + 112))}px`;
+      galleryFloating.style.top = `${Math.max(6, Math.min(window.innerHeight - 38, rect.bottom - 42))}px`;
+      galleryFloating.style.left = `${Math.max(6, Math.min(window.innerWidth - 110, rect.left + 50))}px`;
       currentGallery = { ...carousel, title: target.title };
     } else { galleryFloating.className = "float gallery-float"; currentGallery = null; }
     current = target;
     floating.className = "float show";
-    // Como Pinterest: una píldora pequeña «Guardar» arriba a la izquierda; al pulsarla se elige la carpeta.
-    floating.replaceChildren(mark(), textNode("span", "Guardar"));
+    // Discreto: solo el icono, redondo y pequeño, abajo a la izquierda (no tapa el título ni los botones de la página).
+    floating.replaceChildren(mark());
     floating.title = `${label(target)} en Lúmina`;
     floating.setAttribute("aria-label", `${label(target)} en Lúmina`);
-    floating.style.top = `${Math.max(6, Math.min(window.innerHeight - 38, rect.top + 10))}px`;
-    floating.style.left = `${Math.max(6, Math.min(window.innerWidth - 110, rect.left + 10))}px`;
+    floating.style.top = `${Math.max(6, Math.min(window.innerHeight - 38, rect.bottom - 42))}px`;
+    floating.style.left = `${Math.max(6, Math.min(window.innerWidth - 38, rect.left + 10))}px`;
   }
 
   let currentGallery = null;
@@ -161,6 +169,10 @@
         const body = comment.querySelector(':scope > [slot="comment"]');
         if (body && (body.contains(element) || comment.querySelector(':scope > [slot="commentMeta"]')?.contains(element))) return { target: { kind: "comment", element: comment }, box: body };
       }
+    }
+    if (isFacebook) {
+      const article = facebookArticle(element);
+      if (article && article.getBoundingClientRect().height >= 120) return { target: { kind: "facebook", element: article }, box: article };
     }
     const image = element.closest("img") || (element.matches?.("a, div") ? element.querySelector?.(":scope > img") : null);
     if (image && !(isX && image.closest('[data-testid="Tweet-User-Avatar"]'))) {
@@ -221,6 +233,7 @@
   function payloadFor(target) {
     if (target.kind === "comment") return { type: "LUMINA_SAVE_STRUCTURED", data: globalThis.LuminaPage.readRedditComment(target.element, document) };
     if (target.kind === "tweet") return { type: "LUMINA_SAVE_STRUCTURED", data: globalThis.LuminaPage.readTweet(target.element) };
+    if (target.kind === "facebook") return { type: "LUMINA_SAVE_STRUCTURED", data: globalThis.LuminaPage.readFacebookPost(target.element) };
     if (target.kind === "image") return { type: "LUMINA_SAVE_IMAGE", srcUrl: target.src, pageUrl: location.href, title: target.title };
     if (target.kind === "video") return { type: "LUMINA_SAVE_LINK", url: target.url, title: target.title };
     return { type: "LUMINA_SAVE_PAGE" };
