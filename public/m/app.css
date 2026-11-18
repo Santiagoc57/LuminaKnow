@@ -35,3 +35,45 @@ input.code { text-align: center; font-size: 26px; letter-spacing: .35em; }
 #toast { position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom)); transform: translate(-50%, 20px); padding: 12px 18px; border-radius: 99px; background: var(--ink); color: var(--bg); font-weight: 600; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; max-width: calc(100% - 32px); text-align: center; }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 ol.steps { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 6px; }
+
+/* Biblioteca */
+main { gap: 14px; }
+.tabs { display: flex; gap: 6px; padding: 4px; border-radius: 99px; background: var(--card); box-shadow: inset 0 0 0 1px var(--line); }
+.tabs button { flex: 1; min-height: 38px; background: none; color: var(--muted); font-size: 14px; }
+.tabs button.active { background: var(--ink); color: var(--bg); }
+.badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 99px; background: var(--accent); color: #fff; font-size: 12px; }
+.search input { border-radius: 99px; padding: 0 18px; }
+.chips { display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px; padding: 0 16px 2px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: none; min-height: 34px; padding: 0 14px; background: var(--card); color: var(--ink); font-size: 13.5px; font-weight: 500; box-shadow: inset 0 0 0 1px var(--line); }
+.chip i { width: 9px; height: 9px; border-radius: 50%; border: 2px solid; }
+.chip.active { background: var(--ink); color: var(--bg); box-shadow: none; }
+.count { margin: -4px 2px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: start; }
+@media (min-width: 520px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.tile { display: grid; gap: 0; min-height: 0; padding: 0; border-radius: 14px; overflow: hidden; background: var(--card); color: var(--ink); text-align: left; font-weight: 400; box-shadow: 0 1px 3px rgba(0,0,0,.06); align-items: stretch; justify-content: stretch; }
+.cover { display: grid; place-items: center; aspect-ratio: 4 / 3; background: var(--line) center / cover no-repeat; color: var(--muted); font-size: 12px; }
+.tile-meta { display: grid; gap: 2px; padding: 9px 11px 11px; }
+.tile-meta strong { font-size: 13.5px; font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.tile-meta small { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile.is-text .note-text { margin: 0; padding: 12px 11px 0; font-size: 13px; line-height: 1.4; color: var(--ink); display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
+.tile.is-note .tile-meta strong { display: none; }
+
+/* Ficha */
+body.has-sheet { overflow: hidden; }
+#sheet { position: fixed; inset: 0; z-index: 10; overflow-y: auto; background: var(--bg); padding: env(safe-area-inset-top) 16px calc(32px + env(safe-area-inset-bottom)); }
+.sheet-bar { position: sticky; top: 0; display: flex; align-items: center; gap: 10px; padding: 12px 0; background: var(--bg); z-index: 1; }
+button.icon { min-height: 40px; width: 40px; padding: 0; background: var(--card); color: var(--ink); font-size: 20px; box-shadow: inset 0 0 0 1px var(--line); }
+.detail { display: grid; gap: 14px; max-width: 560px; margin: 0 auto; }
+.hero { display: block; width: 100%; aspect-ratio: 16 / 10; border-radius: 16px; background: var(--line) center / cover no-repeat; }
+.detail h1 { margin: 0; font-size: 22px; line-height: 1.25; }
+.detail section { display: grid; gap: 8px; }
+.detail ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { min-height: 30px; padding: 0 12px; background: var(--card); color: var(--ink); font-size: 13px; font-weight: 500; box-shadow: inset 0 0 0 1px var(--line); }
+.actions-row > * { flex: 1 1 auto; }
+button.soft.on { background: var(--ink); color: var(--bg); box-shadow: none; }
+blockquote { margin: 0; padding: 10px 14px; border-left: 3px solid var(--accent); border-radius: 0 12px 12px 0; background: var(--card); }
+blockquote small { display: block; margin-top: 6px; color: var(--muted); }
+textarea { width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink); font: inherit; font-size: 16px; resize: vertical; }
+.tile.is-text:not(.is-note) .note-text { color: var(--muted); }
