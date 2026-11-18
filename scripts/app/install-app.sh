@@ -1,8 +1,8 @@
 #!/bin/zsh
-# Crea ~/Applications/LUMINA.app: un doble clic arranca LUMINA (si no está corriendo) y abre su ventana.
+# Crea /Applications/LUMINA.app: un doble clic arranca LUMINA (si no está corriendo) y abre su ventana.
 set -e
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-APP="$HOME/Applications/LUMINA.app"
+APP="/Applications/LUMINA.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 sed "s|__ROOT__|$ROOT|" "$ROOT/scripts/app/launcher.sh" > "$APP/Contents/MacOS/LUMINA"

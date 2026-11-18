@@ -16,7 +16,7 @@ export function autostartEnabled() {
 }
 
 export function appInstalled() {
-  return fs.existsSync(path.join(os.homedir(), "Applications", "LUMINA.app"));
+  return fs.existsSync("/Applications/LUMINA.app") || fs.existsSync(path.join(os.homedir(), "Applications", "LUMINA.app"));
 }
 
 export async function setAutostart(enabled: boolean) {
