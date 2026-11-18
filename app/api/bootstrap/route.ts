@@ -10,6 +10,7 @@ import { recoverTaggingJobs } from "@/lib/tagging";
 import { hasExtensionToken } from "@/lib/extension-auth";
 import { listSmartSpaces } from "@/lib/spaces";
 import { scheduleVisualBackfill } from "@/lib/vision";
+import { maintenanceReport } from "@/lib/weekly-maintenance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,6 +48,7 @@ export async function GET(request: Request) {
       aiLastError: (() => { const error = (globalThis as { __luminaLastSummaryError?: unknown }).__luminaLastSummaryError; return error instanceof Error ? error.message.slice(0, 180) : ""; })(),
       collections,
       tags,
+      maintenance: maintenanceReport(),
       usage: getMonthlyUsage(),
       hasAiKey: hasAIKey(),
       aiProvider: getAIProvider(),

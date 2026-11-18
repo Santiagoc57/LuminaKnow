@@ -7,4 +7,8 @@ export async function register() {
     const { scheduleDailyBackups } = await import("./lib/backup");
     scheduleDailyBackups();
   }
+  if (process.env.LUMINA_WEEKLY_MAINTENANCE !== "0") {
+    const { scheduleWeeklyMaintenance } = await import("./lib/weekly-maintenance");
+    scheduleWeeklyMaintenance();
+  }
 }

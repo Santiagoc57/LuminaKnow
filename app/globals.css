@@ -2783,3 +2783,8 @@ html[data-theme="dark"] .app-rail .rail-theme:hover { background: rgba(255,255,2
 .lv-folder-suggest button small { color: #b3ada3; }
 .lv-folder-suggest button:hover { color: var(--accent); }
 .lv-folder-suggest .lv-folder-suggest-x { padding: 0 10px 0 4px; }
+
+.week-maintenance { display: grid; gap: 6px; padding: 10px 12px; border-radius: 12px; background: #f6f3ee; font-size: 13px; }
+.week-maintenance p { margin: 0; }
+.week-maintenance small { color: #8d887f; }
+.week-maintenance button { justify-self: start; padding: 6px 12px; border: 0; border-radius: 99px; background: #1f1e1b; color: #fff; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
