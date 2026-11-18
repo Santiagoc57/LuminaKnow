@@ -2762,3 +2762,14 @@ html[data-theme="dark"] .app-rail .rail-theme:hover { background: rgba(255,255,2
 .week-themes button { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border: 0; border-radius: 99px; background: #f0eee9; color: #3b3832; font-size: 12.5px; cursor: pointer; }
 .week-themes button b { color: #8d887f; font-size: 11px; }
 .week-themes button:hover { background: #e7e3db; }
+
+/* Audio y podcasts */
+.lv-audio-stage { display: flex; gap: 22px; align-items: center; padding: 26px; border-radius: 22px; background: var(--card, #fff); box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+.lv-audio-stage > img, .lv-audio-art { width: 150px; height: 150px; flex: none; border-radius: 16px; object-fit: cover; display: grid; place-items: center; background: #efece6; color: #8d887f; }
+.lv-audio-stage h2 { margin: 0 0 6px; font-size: 20px; line-height: 1.25; }
+.lv-audio-stage p { margin: 0 0 14px; color: #8d887f; }
+.lv-audio-stage audio { width: min(420px, 100%); }
+.lv-audio-open { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 99px; background: #1f1e1b; color: #fff; font-weight: 600; text-decoration: none; }
+.lv-audio-time { display: inline-block; min-width: 46px; color: #e75e3a; font-variant-numeric: tabular-nums; font-size: 12.5px; }
+.lv-audio .lv-tldw { margin-top: 18px; }
+@media (max-width: 700px) { .lv-audio-stage { flex-direction: column; align-items: flex-start; } }

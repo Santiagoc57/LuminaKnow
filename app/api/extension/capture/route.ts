@@ -36,7 +36,7 @@ function jobKindFor(sourceType: SourceType) {
 }
 
 function fallbackTitle(sourceType: SourceType) {
-  return sourceType === "youtube" ? "Video guardado" : sourceType === "reddit" ? "Publicación de Reddit" : sourceType === "x" ? "Publicación de X" : "Página guardada";
+  return sourceType === "youtube" ? "Video guardado" : sourceType === "audio" ? "Audio guardado" : sourceType === "reddit" ? "Publicación de Reddit" : sourceType === "x" ? "Publicación de X" : "Página guardada";
 }
 
 export function OPTIONS(request: Request) { return extensionOptions(request); }

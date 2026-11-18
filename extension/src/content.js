@@ -514,8 +514,60 @@
     }
   });
 
+  // Tus recortes de esta página, resaltados al volver (sin tocar el contenido: CSS Custom Highlight API).
+  const highlightSupported = typeof CSS !== "undefined" && CSS.highlights && typeof Highlight === "function";
+  function rangesFor(quotes) {
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, { acceptNode: (node) => {
+      const parent = node.parentElement;
+      if (!parent || /^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA|INPUT)$/.test(parent.tagName) || parent.closest("#lumina-toast-host")) return NodeFilter.FILTER_REJECT;
+      return node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+    } });
+    const nodes = [];
+    let text = "";
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) { nodes.push({ node, start: text.length }); text += node.nodeValue + " "; }
+    const locate = (offset) => {
+      let low = 0;
+      let high = nodes.length - 1;
+      while (low < high) { const mid = (low + high + 1) >> 1; if (nodes[mid].start <= offset) low = mid; else high = mid - 1; }
+      const entry = nodes[low];
+      return { node: entry.node, offset: Math.min(offset - entry.start, entry.node.nodeValue.length) };
+    };
+    const ranges = [];
+    for (const quote of quotes) {
+      const words = quote.split(/\s+/).filter(Boolean).slice(0, 60);
+      if (!words.length) continue;
+      const pattern = new RegExp(words.map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+"), "i");
+      const match = pattern.exec(text);
+      if (!match) continue;
+      try {
+        const start = locate(match.index);
+        const end = locate(match.index + match[0].length);
+        const range = document.createRange();
+        range.setStart(start.node, start.offset);
+        range.setEnd(end.node, end.offset);
+        ranges.push(range);
+      } catch { /* el texto cambió mientras tanto */ }
+    }
+    return ranges;
+  }
+  async function markSavedClips() {
+    if (!highlightSupported || window.top !== window) return;
+    const result = await send({ type: "LUMINA_PAGE_HIGHLIGHTS", url: location.href }).catch(() => null);
+    if (!result || !Array.isArray(result.quotes) || !result.quotes.length) { CSS.highlights.delete("lumina-clip"); return; }
+    const ranges = rangesFor(result.quotes);
+    if (!ranges.length) return;
+    CSS.highlights.set("lumina-clip", new Highlight(...ranges));
+    if (!document.getElementById("lumina-clip-style")) {
+      const style = document.createElement("style");
+      style.id = "lumina-clip-style";
+      style.textContent = "::highlight(lumina-clip) { background-color: rgba(255, 196, 70, .45); color: inherit; }";
+      (document.head || document.documentElement).appendChild(style);
+    }
+  }
+  window.setTimeout(() => void markSavedClips(), 1500);
+
   api.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message?.type === "LUMINA_TOAST") showToast(message.result);
+    if (message?.type === "LUMINA_TOAST") { showToast(message.result); if (message.result && !message.result.error) window.setTimeout(() => void markSavedClips(), 600); }
     if (message?.type === "LUMINA_READ_PAGE") sendResponse(globalThis.LuminaPage.readStructuredPage(document));
     return false;
   });

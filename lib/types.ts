@@ -8,7 +8,7 @@ export type VideoStatus =
   | "needs_transcript"
   | "failed";
 
-export type SourceType = "youtube" | "x" | "reddit" | "web" | "image" | "note" | "pdf" | "palette";
+export type SourceType = "youtube" | "x" | "reddit" | "web" | "image" | "note" | "pdf" | "palette" | "audio";
 
 export type KeyPoint = { text: string; startSeconds: number | null };
 

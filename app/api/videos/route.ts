@@ -136,7 +136,7 @@ export async function POST(request: Request) {
     const id = makeId("vid");
     const now = new Date().toISOString();
     const metadata = mode === "save" ? await getBookmarkMetadata(parsed.sourceType, parsed.url) : null;
-    const storedTitle = metadata?.title || (parsed.sourceType === "youtube" ? "Video guardado" : parsed.sourceType === "reddit" ? "Publicación de Reddit" : parsed.sourceType === "web" ? "Artículo guardado" : "Publicación guardada");
+    const storedTitle = metadata?.title || (parsed.sourceType === "youtube" ? "Video guardado" : parsed.sourceType === "audio" ? "Audio guardado" : parsed.sourceType === "reddit" ? "Publicación de Reddit" : parsed.sourceType === "web" ? "Artículo guardado" : "Publicación guardada");
     const thumbnailUrl = metadata?.thumbnailUrl || (parsed.sourceType === "youtube" ? `https://i.ytimg.com/vi/${parsed.sourceId}/hqdefault.jpg` : "");
     const status = mode === "save" ? "saved" : "queued";
     const jobId = mode === "process" ? makeId("job") : null;

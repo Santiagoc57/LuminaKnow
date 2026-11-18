@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import {
+import { Headphones,
   ArrowDown,
   ArrowLeft,
   ArrowRight,
@@ -75,7 +75,7 @@ import dynamic from "next/dynamic";
 
 // El grafo se carga solo al abrirlo (y así no hay importación circular con ConnectedWorkspaces).
 const GraphWorkspace = dynamic(() => import("./ConnectedWorkspaces").then((module) => module.GraphWorkspace), { ssr: false });
-import { formatTimestamp } from "@/lib/utils";
+import { formatTimestamp, isAudioFileUrl } from "@/lib/utils";
 import { libraryQueryTerms, spaceQueryMatches } from "@/lib/library-query";
 
 async function readJson<T = { ok: boolean }>(url: string, init?: RequestInit) {
@@ -431,6 +431,34 @@ function SourceBody({ video, transcript, minutesOpen = false, onCoverChanged }: 
   if (video.sourceType === "image") {
     return <ImageStage src={artwork} alt={video.visual?.description || video.title} fallback={video.visual?.colors?.[0]?.hex} gallery={galleryOf(video)} />;
   }
+  if (video.sourceType === "audio") {
+    // Podcast o audio: carátula, reproductor si es un archivo directo, y el resumen minuto a minuto con la transcripción.
+    const at = (seconds: number) => <span className="lv-audio-time">{formatTimestamp(seconds)}</span>;
+    return <div className="lv-reading lv-audio">
+      <div className="lv-audio-stage">
+        {artwork ? <img src={artwork} alt="" referrerPolicy="no-referrer" /> : <span className="lv-audio-art"><Headphones size={44} /></span>}
+        <div>
+          <h2>{video.title}</h2>
+          {video.channel && <p>{video.channel}{video.durationSeconds ? ` · ${Math.round(video.durationSeconds / 60)} min` : ""}</p>}
+          {isAudioFileUrl(video.url) ? <audio controls preload="none" src={video.url} /> : <a className="lv-audio-open" href={video.url} target="_blank" rel="noreferrer"><Play size={14} fill="currentColor" /> Escuchar en el original</a>}
+        </div>
+      </div>
+      <LooseClips highlights={highlights} texts={[...transcript.map((chunk) => chunk.text), video.description]} />
+      <section className="lv-tldw">
+        <h2>Minuto a minuto</h2>
+        {video.summary && <p>{video.summary.cardSummary || video.summary.gist}</p>}
+        {(video.summary?.sections ?? []).map((section, index) => <div key={index} className="lv-tldw-section">
+          <h3>{section.title}</h3>
+          <ul>{section.points.map((point, pointIndex) => <li key={pointIndex}>{typeof point.startSeconds === "number" && at(point.startSeconds)} {point.text}</li>)}</ul>
+        </div>)}
+        {!video.summary && <p className="lv-empty-copy">{video.status === "ready" ? "Aún no tiene resumen; abajo está la transcripción." : "Escuchando y transcribiendo el audio…"}</p>}
+        {transcript.length > 0 && <details className="lv-transcript-fold" open={!video.summary}>
+          <summary>Transcripción completa</summary>
+          <div className="lv-transcript">{transcript.map((chunk) => <p key={chunk.id}>{at(chunk.startSeconds)} {chunk.text}</p>)}</div>
+        </details>}
+      </section>
+    </div>;
+  }
   if (video.sourceType === "youtube") {
     // Como mymind: el video ocupa la pantalla; el resumen y las etiquetas viven en el panel de la derecha.
     return <div className="lv-reading lv-video">
@@ -556,6 +584,7 @@ const TYPE_CHIPS: Record<AppVideo["sourceType"], { label: string; query: string;
   note: { label: "Nota", query: "tipo:nota", Icon: StickyNote },
   pdf: { label: "PDF", query: "tipo:pdf", Icon: FileText },
   palette: { label: "Paleta", query: "tipo:paleta", Icon: Palette },
+  audio: { label: "Audio", query: "tipo:audio", Icon: Headphones },
 };
 
 // Las etiquetas del catálogo llevan el icono de su tema (las subetiquetas, el de su tema padre);
@@ -691,7 +720,7 @@ function ConnectionsOverlay({ tab, onTab, onClose, items, video, catalog, collec
 // Preguntas que el lector fantasma sugiere al abrir el chat: las del quiz cuando hay resumen, y unas generales si no.
 function ghostSuggestions(video: AppVideo) {
   const summary = video.summary;
-  const kind = video.sourceType === "youtube" ? "este video" : video.sourceType === "pdf" ? "este documento" : "este texto";
+  const kind = video.sourceType === "youtube" ? "este video" : video.sourceType === "audio" ? "este audio" : video.sourceType === "pdf" ? "este documento" : "este texto";
   if (!canQuiz(video) || !summary) return [`¿Cuál es la idea principal de ${kind}?`, "Explícamelo en palabras simples", "¿Qué puedo aplicar de esto?"];
   return [
     `¿Cuál es la idea central de ${kind}?`,
@@ -805,6 +834,7 @@ function VisualSection({ video, onVibe, onPalette, busy }: { video: AppVideo; on
 function consumeLabels(video: AppVideo) {
   if (movieOf(video)) return { pending: movieOf(video)!.kind === "series" ? "Ya la vi" : "Ya la vi", done: "Vista", Icon: Eye };
   if (video.sourceType === "youtube") return { pending: "Ya vi este video", done: "Video visto", Icon: Eye };
+  if (video.sourceType === "audio") return { pending: "Ya lo escuché", done: "Escuchado", Icon: Headphones };
   if (video.sourceType === "image") return { pending: "Ya vi esta imagen", done: "Imagen vista", Icon: Eye };
   return { pending: "Ya leí esto", done: "Leído", Icon: BookOpenCheck };
 }
@@ -812,7 +842,7 @@ function consumeLabels(video: AppVideo) {
 // El quiz tiene sentido donde hay algo que aprender: videos, artículos y PDF ya analizados (no imágenes, tweets ni notas).
 function canQuiz(video: AppVideo) {
   if (!video.summary?.gist) return false;
-  if (video.sourceType === "youtube" || video.sourceType === "pdf") return true;
+  if (video.sourceType === "youtube" || video.sourceType === "audio" || video.sourceType === "pdf") return true;
   return video.sourceType === "web" && !productOf(video) && !movieOf(video);
 }
 
@@ -927,7 +957,7 @@ function InsightPanel({ minutesOpen, onToggleMinutes, quizOpen, onToggleQuiz, re
           </form>
         </>}
       </div>}
-      <div className="lv-bubbles">{onToggleMinutes && video.sourceType === "youtube" && <button className={minutesOpen ? "on" : ""} aria-pressed={minutesOpen} onClick={onToggleMinutes} title="Resumen minuto a minuto" aria-label="Resumen minuto a minuto"><ListOrdered size={16} /></button>}
+      <div className="lv-bubbles">{onToggleMinutes && (video.sourceType === "youtube" || video.sourceType === "audio") && <button className={minutesOpen ? "on" : ""} aria-pressed={minutesOpen} onClick={onToggleMinutes} title="Resumen minuto a minuto" aria-label="Resumen minuto a minuto"><ListOrdered size={16} /></button>}
       {onToggleQuiz && canQuiz(video) && <button className={quizOpen ? "on" : ""} aria-pressed={quizOpen} onClick={onToggleQuiz} title="Quiz: preguntas para repasar con el chatbot" aria-label="Quiz"><ListChecks size={16} /></button>}
       {onToggleRelated && <button className={relatedOpen ? "on" : ""} aria-pressed={relatedOpen} onClick={onToggleRelated} title={`Conexiones y grafo${relatedCount ? ` · ${relatedCount}` : ""}`} aria-label="Conexiones y grafo"><Link2 size={16} /></button>}
       {isImage && <a href={video.thumbnailUrl} download title="Descargar" aria-label="Descargar imagen"><ArrowDown size={16} /></a>}
@@ -1304,6 +1334,7 @@ function sourceAccent(video: AppVideo): { key: string; label: string } {
   if (video.sourceType === "x") return { key: "x", label: "𝕏" };
   if (video.sourceType === "reddit") return { key: "reddit", label: "r/" };
   if (video.sourceType === "youtube") return { key: "youtube", label: "▶" };
+  if (video.sourceType === "audio") return { key: "audio", label: "♪" };
   if (video.sourceType === "note") return { key: "note", label: "" };
   if (video.sourceType === "palette") return { key: "palette", label: "" };
   if (video.sourceType === "pdf") return { key: "pdf", label: "PDF" };

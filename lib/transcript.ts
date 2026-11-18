@@ -134,7 +134,7 @@ async function downloadSubtitle(metadata: YoutubeMetadata, url: string) {
   }
 }
 
-export async function extractYoutube(url: string): Promise<ExtractedYoutube> {
+export async function extractYoutube(url: string, kind: "youtube" | "audio" = "youtube"): Promise<ExtractedYoutube> {
   const ytDlp = ytDlpPath();
   const { stdout } = await execFileAsync(ytDlp, [
     "--dump-single-json",
@@ -148,9 +148,9 @@ export async function extractYoutube(url: string): Promise<ExtractedYoutube> {
   const transcript = await downloadSubtitle(metadata, url);
   return {
     youtubeId: metadata.id,
-    title: metadata.title || "Video sin título",
-    channel: metadata.channel || metadata.uploader || "Canal desconocido",
-    thumbnailUrl: metadata.thumbnail || `https://i.ytimg.com/vi/${metadata.id}/hqdefault.jpg`,
+    title: metadata.title || (kind === "audio" ? "Audio sin título" : "Video sin título"),
+    channel: metadata.channel || metadata.uploader || (kind === "audio" ? "" : "Canal desconocido"),
+    thumbnailUrl: metadata.thumbnail || (kind === "audio" ? "" : `https://i.ytimg.com/vi/${metadata.id}/hqdefault.jpg`),
     durationSeconds: Math.round(metadata.duration || 0),
     description: metadata.description || "",
     sourceLanguage: transcript.language || metadata.language || "",
@@ -169,14 +169,16 @@ function audioSplitterPath() {
 
 export async function downloadAudioSegments(url: string) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "lumina-audio-"));
-  const original = path.join(directory, "source.m4a");
-  // Se pide el audio ya en m4a: así no hace falta ffmpeg para convertirlo.
+  // Se pide el audio en m4a si existe (así no hace falta ffmpeg); los podcasts suelen ser mp3 y se aceptan tal cual.
   await execFileAsync(ytDlpPath(), [
     "--no-playlist",
-    "-f", "bestaudio[ext=m4a]/best[ext=mp4]",
-    "-o", original,
+    "-f", "bestaudio[ext=m4a]/best[ext=mp4]/bestaudio/best",
+    "-o", path.join(directory, "source.%(ext)s"),
     url,
-  ], { maxBuffer: 10 * 1024 * 1024, timeout: 10 * 60_000 });
+  ], { maxBuffer: 10 * 1024 * 1024, timeout: 30 * 60_000 });
+  const downloaded = (await fs.readdir(directory)).find((name) => name.startsWith("source."));
+  if (!downloaded) throw new Error("No se pudo bajar el audio.");
+  const original = path.join(directory, downloaded);
 
   const splitter = audioSplitterPath();
   if (splitter) {
@@ -186,7 +188,8 @@ export async function downloadAudioSegments(url: string) {
     const files = stdout.split("\n").map((line) => line.trim()).filter((file) => file && existsSync(file) && statSync(file).size > 8_000);
     if (files.length) return { directory, files };
   }
-  const segmentPattern = path.join(directory, "segment-%03d.m4a");
+  const extension = path.extname(original) || ".m4a";
+  const segmentPattern = path.join(directory, `segment-%03d${extension}`);
   await execFileAsync(process.env.FFMPEG_PATH || "ffmpeg", [
     "-hide_banner", "-loglevel", "error", "-y",
     "-i", original,
@@ -196,7 +199,7 @@ export async function downloadAudioSegments(url: string) {
     segmentPattern,
   ], { timeout: 10 * 60_000 });
   const files = (await fs.readdir(directory))
-    .filter((name) => name.startsWith("segment-") && name.endsWith(".m4a"))
+    .filter((name) => name.startsWith("segment-") && name.endsWith(extension))
     .sort()
     .map((name) => path.join(directory, name));
   return { directory, files };

@@ -943,7 +943,7 @@ export function KnowledgeHome({ onClearSpace, scopeActive, profileId, videos, co
     } catch (cause) { setBulkError(cause instanceof Error ? cause.message : "No se pudo completar la acción."); }
     finally { setBulkBusy(false); }
   }
-  const videoSources = filteredVideos.filter((video) => video.sourceType === "youtube");
+  const videoSources = filteredVideos.filter((video) => video.sourceType === "youtube" || video.sourceType === "audio");
   const imageSources = filteredVideos.filter((video) => video.sourceType === "image");
   const pdfSources = filteredVideos.filter((video) => video.sourceType === "pdf");
   const noteSources = filteredVideos.filter((video) => video.sourceType === "note");

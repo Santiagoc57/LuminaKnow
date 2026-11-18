@@ -91,7 +91,7 @@ function parseTokens(tokens: string[], parsed = emptyQuery()) {
 }
 
 const COLOR_WORDS: Record<string, string> = { rojo: "rojo", rojos: "rojo", roja: "rojo", rojas: "rojo", naranja: "naranja", naranjas: "naranja", amarillo: "amarillo", amarillos: "amarillo", amarilla: "amarillo", amarillas: "amarillo", verde: "verde", verdes: "verde", azul: "azul", azules: "azul", morado: "morado", morados: "morado", morada: "morado", moradas: "morado", rosa: "rosa", rosado: "rosa", rosados: "rosa", rosada: "rosa", negro: "negro", negros: "negro", negra: "negro", negras: "negro", blanco: "blanco", blancos: "blanco", blanca: "blanco", blancas: "blanco", gris: "gris", grises: "gris", marron: "marron", cafe: "marron" };
-const TYPE_WORDS = new Set(["captura", "capturas", "pantallazo", "pantallazos", "screenshot", "screenshots", "foto", "fotos", "imagen", "imagenes", "video", "videos", "nota", "notas", "pdf", "pdfs", "publicacion", "publicaciones", "tweet", "tweets", "articulo", "articulos", "pelicula", "peliculas", "producto", "productos", "paleta", "paletas", "cita", "citas"]);
+const TYPE_WORDS = new Set(["captura", "capturas", "pantallazo", "pantallazos", "screenshot", "screenshots", "foto", "fotos", "imagen", "imagenes", "video", "videos", "nota", "notas", "pdf", "pdfs", "publicacion", "publicaciones", "tweet", "tweets", "articulo", "articulos", "pelicula", "peliculas", "producto", "productos", "paleta", "paletas", "cita", "citas", "audio", "audios", "podcast", "podcasts"]);
 // Palabras de relleno al buscar como se habla («lo que guardé sobre…», «cosas en azul»): no son términos a buscar.
 const FILLER = new Set(["lo", "que", "guarde", "guardado", "guardados", "guardadas", "he", "mis", "mi", "cosas", "todo", "todas", "todos", "sobre", "con", "de", "del", "la", "las", "el", "los", "y", "un", "una", "unos", "unas", "en", "color", "colores", "tono", "tonos", "algo", "acerca"]);
 
@@ -141,6 +141,7 @@ function sourceMatches(video: AppVideo, requested: string) {
   const type = normalize(requested);
   if (!type) return true;
   if (["video", "videos", "youtube"].includes(type)) return video.sourceType === "youtube";
+  if (["audio", "audios", "podcast", "podcasts", "episodio", "episodios"].includes(type)) return video.sourceType === "audio";
   if (["x", "twitter", "tweet"].includes(type)) return video.sourceType === "x";
   if (["reddit", "post"].includes(type)) return video.sourceType === "reddit";
   if (["social", "publicacion", "publicaciones"].includes(type)) return video.sourceType === "x" || video.sourceType === "reddit";

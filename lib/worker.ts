@@ -262,11 +262,12 @@ async function runPdfJob(jobId: string, videoId: string) {
 
 async function runMetadataJob(jobId: string, videoId: string) {
   const db = getDb();
-  const video = db.prepare("SELECT url FROM videos WHERE id = ?").get(videoId) as { url: string } | undefined;
+  const video = db.prepare("SELECT url, source_type AS sourceType FROM videos WHERE id = ?").get(videoId) as { url: string; sourceType: string } | undefined;
   if (!video) return;
   updateJob(jobId, "running");
   updateVideo(videoId, "extracting", { error: "" });
-  const extracted = await extractYoutube(video.url);
+  // Videos de YouTube y también podcasts o audios (yt-dlp sabe leer ambos).
+  const extracted = await extractYoutube(video.url, video.sourceType === "audio" ? "audio" : "youtube");
   updateVideo(videoId, extracted.cues.length ? "indexing" : "needs_transcript", {
     title: extracted.title,
     channel: extracted.channel,

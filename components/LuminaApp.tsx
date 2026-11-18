@@ -816,7 +816,7 @@ function ShelfPanel({ videos, onOpen }: { videos: AppVideo[]; onOpen: (id: strin
 }
 
 function filterByScope(videos: AppVideo[], scope: Exclude<LibraryScope, null>) {
-  if (scope === "youtube") return videos.filter((video) => video.sourceType === "youtube");
+  if (scope === "youtube") return videos.filter((video) => video.sourceType === "youtube" || video.sourceType === "audio");
   if (scope === "images") return videos.filter((video) => video.sourceType === "image");
   if (scope === "notes") return videos.filter((video) => video.sourceType === "note");
   if (scope === "pdfs") return videos.filter((video) => video.sourceType === "pdf");
@@ -838,7 +838,7 @@ function LibraryScopeNavigation({ data, libraryScope, onLibraryScope, placement 
   const videos = pool ?? data.videos;
   const items = [
     { id: "all" as const, label: "Toda la biblioteca", icon: <Library size={15} />, count: videos.length },
-    { id: "youtube" as const, label: "Videos", icon: <Play size={15} />, count: videos.filter((video) => video.sourceType === "youtube").length },
+    { id: "youtube" as const, label: "Videos", icon: <Play size={15} />, count: videos.filter((video) => video.sourceType === "youtube" || video.sourceType === "audio").length },
     { id: "notes" as const, label: "Notas", icon: <NotebookPen size={15} />, count: videos.filter((video) => video.sourceType === "note").length },
     { id: "pdfs" as const, label: "PDF", icon: <FileText size={15} />, count: videos.filter((video) => video.sourceType === "pdf").length },
     { id: "images" as const, label: "Imágenes", icon: <ImageIcon size={15} />, count: videos.filter((video) => video.sourceType === "image").length },
@@ -1134,7 +1134,7 @@ export function LuminaApp({ initialSurface = "home", initialConversationId = nul
     ? data.videos.filter((video) => video.tags.some((tag) => tag.id === activeTag))
     : libraryScope === "archived" ? data.archived
     : libraryScope === "unsorted" ? data.videos.filter((video) => !video.collections.length)
-      : libraryScope === "youtube" ? data.videos.filter((video) => video.sourceType === "youtube")
+      : libraryScope === "youtube" ? data.videos.filter((video) => video.sourceType === "youtube" || video.sourceType === "audio")
       : libraryScope === "images" ? data.videos.filter((video) => video.sourceType === "image")
       : libraryScope === "notes" ? data.videos.filter((video) => video.sourceType === "note")
       : libraryScope === "pdfs" ? data.videos.filter((video) => video.sourceType === "pdf")

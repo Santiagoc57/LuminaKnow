@@ -232,6 +232,7 @@ extensionApi.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "LUMINA_BOARDS") return boardsForPicker();
     if (message.type === "LUMINA_CREATE_BOARD") return request("/api/extension/boards", { name: message.name });
     if (message.type === "LUMINA_COLLECT") return collect(message.id, message.collectionId);
+    if (message.type === "LUMINA_PAGE_HIGHLIGHTS") { const config = await settings(); if (!config.token) return { quotes: [] }; return request(`/api/extension/highlights?url=${encodeURIComponent(message.url)}`); }
     if (message.type === "LUMINA_ITEM") return request(`/api/extension/item?id=${encodeURIComponent(message.id)}`);
     if (message.type === "LUMINA_ADD_NOTE") return request("/api/extension/note", { id: message.id, note: message.note });
     if (message.type === "LUMINA_OPEN") { const config = await settings(); await extensionApi.tabs.create({ url: `${config.serverUrl}${message.path || "/"}` }); return { ok: true }; }

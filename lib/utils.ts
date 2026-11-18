@@ -116,6 +116,25 @@ export function parseWebUrl(input: string): { pageId: string; url: string } | nu
   }
 }
 
+// Podcasts y audios que yt-dlp sabe bajar: episodios de Apple Podcasts, SoundCloud, iVoox o un archivo de audio directo.
+// (Spotify no: su audio está protegido.)
+const AUDIO_FILE = /\.(mp3|m4a|aac|wav|ogg|oga|opus|flac)$/i;
+export function parseAudioUrl(input: string) {
+  const web = parseWebUrl(input);
+  if (!web) return null;
+  const url = new URL(web.url);
+  const host = url.hostname.replace(/^www\./, "");
+  const isEpisode = (host === "podcasts.apple.com" && url.searchParams.has("i"))
+    || (host === "soundcloud.com" && url.pathname.split("/").filter(Boolean).length === 2 && !/^(discover|search|stream|you|upload|charts)$/.test(url.pathname.split("/")[1] || ""))
+    || (host.endsWith("ivoox.com") && /_rf_\d+/.test(url.pathname))
+    || AUDIO_FILE.test(url.pathname);
+  return isEpisode ? { audioId: `audio:${web.url}`, url: web.url } : null;
+}
+
+export function isAudioFileUrl(input: string) {
+  try { return AUDIO_FILE.test(new URL(input).pathname); } catch { return false; }
+}
+
 export function parseSourceUrl(input: string) {
   const youtube = parseYouTubeUrl(input);
   if (youtube) return { sourceType: "youtube" as const, sourceId: youtube.youtubeId, url: youtube.url };
@@ -123,6 +142,8 @@ export function parseSourceUrl(input: string) {
   if (post) return { sourceType: "x" as const, sourceId: post.postId, url: post.url };
   const reddit = parseRedditUrl(input);
   if (reddit) return { sourceType: "reddit" as const, sourceId: reddit.postId, url: reddit.url };
+  const audio = parseAudioUrl(input);
+  if (audio) return { sourceType: "audio" as const, sourceId: audio.audioId, url: audio.url };
   const web = parseWebUrl(input);
   if (web) return { sourceType: "web" as const, sourceId: web.pageId, url: web.url };
   return null;

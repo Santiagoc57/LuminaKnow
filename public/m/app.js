@@ -23,7 +23,7 @@
     const hours = Math.round(minutes / 60);
     return hours < 24 ? `hace ${hours} h` : `hace ${Math.round(hours / 24)} d`;
   };
-  const TYPE_LABEL = { youtube: "Video", tiktok: "Video", instagram: "Publicación", x: "Publicación", reddit: "Publicación", web: "Página", article: "Artículo", image: "Imagen", pdf: "PDF", note: "Nota" };
+  const TYPE_LABEL = { youtube: "Video", tiktok: "Video", instagram: "Publicación", x: "Publicación", reddit: "Publicación", web: "Página", article: "Artículo", image: "Imagen", pdf: "PDF", note: "Nota", audio: "Audio" };
   const typeLabel = (type) => TYPE_LABEL[type] || "Fuente";
 
   function toast(message) {
