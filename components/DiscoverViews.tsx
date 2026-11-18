@@ -893,6 +893,9 @@ function InsightPanel({ minutesOpen, onToggleMinutes, quizOpen, onToggleQuiz, re
   const [newSpace, setNewSpace] = useState("");
   const inSomeSpace = (spaces ?? []).some((space) => space.itemIds.includes(video.id) || spaceQueryMatches(space.query, video, catalog));
   const [copied, setCopied] = useState(false);
+  // Las notas se pueden plegar; se recuerda la preferencia.
+  const [notesOpen, setNotesOpen] = useState(() => { try { return window.localStorage.getItem("lumina-notes-open") !== "0"; } catch { return true; } });
+  const toggleNotes = () => setNotesOpen((current) => { try { window.localStorage.setItem("lumina-notes-open", current ? "0" : "1"); } catch { /* sin almacenamiento */ } return !current; });
   const isImage = video.sourceType === "image";
   const isPalette = video.sourceType === "palette";
   const isNote = video.sourceType === "note";
@@ -942,7 +945,6 @@ function InsightPanel({ minutesOpen, onToggleMinutes, quizOpen, onToggleQuiz, re
 
   const ghostProps = { ...ghost, onSave: saveGhostAnswer, chat: chatMode, onOpenChat: () => onChatMode?.(true), onCloseChat: () => onChatMode?.(false), suggestions: ghostSuggestions(video) };
   const footer = <footer className="lv-actions"><div className="lv-actions-inner">
-      {!isNote && !isImage && !isPalette && <button className={`lv-consume ${video.consumedAt ? "done" : ""}`} disabled={busy} aria-pressed={Boolean(video.consumedAt)} onClick={() => void patch(video.consumedAt ? "unconsume" : "consume")}>{video.consumedAt ? <Check size={15} /> : <consume.Icon size={15} />}{video.consumedAt ? consume.done : consume.pending}</button>}
       {collectionsOpen && collections && <div className="lv-collection-picker" role="menu">
         {spaces && <>
           <strong>Carpetas</strong>
@@ -957,7 +959,8 @@ function InsightPanel({ minutesOpen, onToggleMinutes, quizOpen, onToggleQuiz, re
           </form>
         </>}
       </div>}
-      <div className="lv-bubbles">{onToggleMinutes && (video.sourceType === "youtube" || video.sourceType === "audio") && <button className={minutesOpen ? "on" : ""} aria-pressed={minutesOpen} onClick={onToggleMinutes} title="Resumen minuto a minuto" aria-label="Resumen minuto a minuto"><ListOrdered size={16} /></button>}
+      <div className="lv-bubbles">{!isNote && !isImage && !isPalette && <button className={`lv-consume-bubble ${video.consumedAt ? "on" : ""}`} disabled={busy} aria-pressed={Boolean(video.consumedAt)} onClick={() => void patch(video.consumedAt ? "unconsume" : "consume")} title={video.consumedAt ? `${consume.done} · pulsa para desmarcar` : consume.pending} aria-label={video.consumedAt ? consume.done : consume.pending}><Check size={16} /></button>}
+      {onToggleMinutes && (video.sourceType === "youtube" || video.sourceType === "audio") && <button className={minutesOpen ? "on" : ""} aria-pressed={minutesOpen} onClick={onToggleMinutes} title="Resumen minuto a minuto" aria-label="Resumen minuto a minuto"><ListOrdered size={16} /></button>}
       {onToggleQuiz && canQuiz(video) && <button className={quizOpen ? "on" : ""} aria-pressed={quizOpen} onClick={onToggleQuiz} title="Quiz: preguntas para repasar con el chatbot" aria-label="Quiz"><ListChecks size={16} /></button>}
       {onToggleRelated && <button className={relatedOpen ? "on" : ""} aria-pressed={relatedOpen} onClick={onToggleRelated} title={`Conexiones y grafo${relatedCount ? ` · ${relatedCount}` : ""}`} aria-label="Conexiones y grafo"><Link2 size={16} /></button>}
       {isImage && <a href={video.thumbnailUrl} download title="Descargar" aria-label="Descargar imagen"><ArrowDown size={16} /></a>}
@@ -1014,8 +1017,8 @@ function InsightPanel({ minutesOpen, onToggleMinutes, quizOpen, onToggleQuiz, re
         </div>
       </div>}
     </section>
-    {!isNote && <section>
-      <h3>Notas</h3>
+    {!isNote && <section className={`lv-notes-section ${notesOpen ? "" : "collapsed"}`}>
+      <h3><button className="lv-notes-toggle" onClick={() => toggleNotes()} aria-expanded={notesOpen} title={notesOpen ? "Ocultar notas" : "Mostrar notas"}>Notas{!notesOpen && note.trim() ? <small> · {note.trim().split(/\s+/).length} palabras</small> : null}<ChevronDown size={14} /></button></h3>
       <textarea className="lv-note-input" value={note} onChange={(event) => { setNote(event.target.value); event.target.style.height = "auto"; event.target.style.height = `${event.target.scrollHeight}px`; }} onFocus={(event) => { event.target.style.height = "auto"; event.target.style.height = `${event.target.scrollHeight}px`; }} onBlur={saveNote} placeholder="Escribe aquí una nota…" rows={1} />
     </section>}
     {isNote && <NoteHistory videoId={video.id} onRestored={onNoteReplaced} />}

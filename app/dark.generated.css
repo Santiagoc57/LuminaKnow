@@ -934,6 +934,8 @@ html[data-theme="dark"] .lv-folder-suggest { border: 1px dashed hsl(39 3% 22%); 
 html[data-theme="dark"] .week-maintenance { background: hsl(37 6% 17%); }
 html[data-theme="dark"] .week-maintenance small { color: hsl(39 6% 71%); }
 html[data-theme="dark"] .week-maintenance button { background: hsl(45 2% 32%); }
+html[data-theme="dark"] .lv-notes-toggle small { color: hsl(39 6% 71%); }
+html[data-theme="dark"] .lv-notes-toggle svg { color: hsl(39 6% 71%); }
 
 /* «ESC para cerrar» va sobre el fondo oscuro del modal: blanco también en modo oscuro. */
 html[data-theme="dark"] .lv-modal-esc { color: rgba(255,255,255,.82); }
