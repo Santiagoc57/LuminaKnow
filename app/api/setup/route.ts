@@ -20,7 +20,13 @@ const setupSchema = z.object({
 
 export async function GET() {
   try {
-    const profiles = getDb().prepare("SELECT id, name, avatar_color AS avatarColor FROM profiles ORDER BY created_at").all();
+    // Perfiles ocultos (settings.hidden_profiles): no se borran, solo no aparecen al entrar. LUMINA es de una sola persona.
+    const hiddenRow = getDb().prepare("SELECT value FROM settings WHERE key = 'hidden_profiles'").get() as { value: string } | undefined;
+    let hidden: string[] = [];
+    try { hidden = hiddenRow ? JSON.parse(hiddenRow.value) : []; } catch { hidden = []; }
+    const all = getDb().prepare("SELECT id, name, avatar_color AS avatarColor FROM profiles ORDER BY created_at").all() as Array<{ id: string; name: string; avatarColor: string }>;
+    const visible = all.filter((profile) => !hidden.includes(profile.id));
+    const profiles = visible.length ? visible : all;
     return NextResponse.json({ configured: profiles.length > 0, profiles, hasAiKey: hasAIKey(), aiProvider: getAIProvider(), hasGeminiKey: Boolean(getGeminiKey()), hasOpenAIKey: Boolean(getOpenAIKey()) });
   } catch (error) { return apiError(error); }
 }

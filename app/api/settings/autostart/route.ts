@@ -3,13 +3,16 @@ import { z } from "zod";
 import { requireProfile } from "@/lib/auth";
 import { appInstalled, autostartEnabled, setAutostart } from "@/lib/autostart";
 import { apiError } from "@/lib/http";
+import { lanAddresses } from "@/lib/mobile-https";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     await requireProfile();
-    return NextResponse.json({ enabled: autostartEnabled(), appInstalled: appInstalled() });
+    // Direcciones de este Mac en la red de casa, para abrir LUMINA desde otro Mac.
+    const port = new URL(request.url).port || "3000";
+    return NextResponse.json({ enabled: autostartEnabled(), appInstalled: appInstalled(), addresses: lanAddresses().map((ip) => `${ip}:${port}`) });
   } catch (error) { return apiError(error); }
 }
 

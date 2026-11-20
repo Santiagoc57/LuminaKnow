@@ -1,74 +1,122 @@
-# Lúmina
+<p align="center">
+  <img src="public/og.png" alt="LUMINA" width="720" />
+</p>
 
-Biblioteca web privada para guardar videos de YouTube y publicaciones públicas de X, resumirlos, organizarlos y conversar con el conocimiento indexado usando citas verificables.
+<h1 align="center">LUMINA</h1>
 
-## Fuentes compatibles
+<p align="center">
+  <strong>Tu segunda mente, privada y local.</strong><br />
+  Guarda lo que encuentras en la web y LUMINA lo resume, lo etiqueta y lo conecta. Después puedes preguntarle lo que quieras a tu biblioteca.
+</p>
 
-- YouTube y Shorts: guarda solo el enlace o procesa subtítulos, resumen, entidades y citas temporales.
-- Publicaciones públicas de X: pega una URL de `x.com` o `twitter.com`; Lúmina obtiene el texto mediante el oEmbed público oficial, conserva una copia local y permite guardarlo o analizarlo.
-- X funciona sin clave ni API de X. Por ahora no importa Favoritos/Bookmarks automáticamente ni reconstruye hilos o respuestas completas.
+<p align="center">
+  <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-black" />
+  <img alt="React 19" src="https://img.shields.io/badge/React-19-149eca" />
+  <img alt="SQLite" src="https://img.shields.io/badge/SQLite-local-003b57" />
+  <img alt="macOS" src="https://img.shields.io/badge/macOS-13%2B-555" />
+  <img alt="Privado" src="https://img.shields.io/badge/datos-100%25%20en%20tu%20Mac-e75e3a" />
+</p>
 
-## Conocimiento conectado
+---
 
-- El inicio funciona como un asistente: primero eliges colecciones o fuentes y luego preguntas.
-- Cada colección conserva un chat independiente por perfil y permite excluir fuentes antes de consultar.
-- La recuperación combina transcripciones, resúmenes y notas; cada mensaje guarda una copia de las fuentes usadas.
-- Las respuestas incluyen la fuente y el tipo de evidencia; los videos añaden el segundo verificable y las publicaciones enlazan al post original. Si la cuota de IA falla, se usa una respuesta extractiva local.
-- El grafo global en `/graph` conecta fuentes, colecciones, etiquetas, entidades e ideas. Las conexiones sugeridas pueden confirmarse u ocultarse.
-- Las colecciones recuerdan la vista de tarjetas o lista en cada dispositivo.
+## Qué es
 
-Las rutas principales son `POST /api/chat`, `GET /api/models`, `GET /api/collections/:id`, `GET /api/graph` y `PATCH /api/graph/edges/:id`. La ruta anterior de chat por video sigue funcionando como adaptador.
+LUMINA es un gestor de conocimiento personal en la línea de mymind. Todo vive en tu Mac: tus fuentes, tus notas, tus subrayados y la base de datos. Nada pasa por un servidor ajeno, salvo las llamadas a IA que tú decides hacer.
+
+## Características
+
+### Guardar
+- **Cualquier fuente:** videos de YouTube, publicaciones e hilos de X, Reddit, Facebook, webs, artículos, imágenes, galerías, PDF, audio, notas y paletas de color.
+- **Extensión para Chrome y Firefox:**
+  - Un diálogo centrado con título editable, etiquetas sugeridas (que puedes quitar), espacio sugerido y nota.
+  - Un botón en cada tweet y un icono discreto sobre imágenes, videos y posts.
+  - Captura de la página como portada, como hace mymind.
+- **Celular:** una app instalable (PWA) que aparece en «Compartir», con la biblioteca para leer sin conexión y un chat.
+- **Telegram:** reenvía enlaces a tu bot y llegan a LUMINA.
+
+### Entender
+- **Resúmenes en español:** con ideas clave, títulos que dicen de qué trata cada cosa y un resumen minuto a minuto de los videos.
+- **Visión local** (Apple Vision): texto dentro de imágenes, objetos y colores, sin enviar nada fuera.
+- **Transcripciones** de videos y audio, descargables en `.txt`.
+
+### Encontrar
+- **Un buscador que entiende lo que escribes:** fechas habladas («en septiembre»), tipos (`tipo:pdf`), colores, objetos, texto dentro de imágenes y momentos dentro de los videos.
+- **Espacios inteligentes:** tableros que se llenan solos con reglas. Cada uno tiene su chat, se puede ver como documento y como línea de tiempo.
+- **«Más como esto»:** muestra imágenes que se ven parecidas.
+
+### Conversar
+- **Chat con toda tu biblioteca,** con un espacio o con una sola fuente. Las respuestas citan su origen y el segundo exacto en los videos.
+- **Subrayados y recortes con nota,** que se resaltan cuando vuelves a visitar la página.
+
+### Ordenar
+- **Limpieza inteligente:** propone qué conservar y qué olvidar, une etiquetas parecidas y mejora los títulos.
+- **«En mente»:** las fuentes que fijas para tenerlas a mano.
+- **Grafo de conocimiento y revisión diaria:** están en el menú del perfil.
+
+### Como app de Mac
+- **`LUMINA.app` en Aplicaciones:** con su icono en el Dock, se abre en su propia ventana y puede arrancar sola al iniciar sesión.
+- **Sincronización por turnos con iCloud Drive** entre tus Mac. Si hay un conflicto, la otra versión se guarda aparte y no se pierde nada.
 
 ## Inicio rápido
 
-Requisitos: macOS, Node.js 20+, Homebrew, `yt-dlp` y FFmpeg.
+Requisitos: macOS 13 o posterior, Node.js 20 o posterior, `yt-dlp` y FFmpeg.
 
 ```bash
 npm install
 npm run dev -- --hostname 0.0.0.0
 ```
 
-Abre `http://localhost:3000`. La primera pantalla crea los dos perfiles, sus PIN y permite guardar una clave gratuita de Gemini. OpenAI permanece disponible como respaldo opcional.
+Abre `http://localhost:3000`. La primera pantalla crea tu perfil con su PIN y te pide la clave de IA (Gemini u OpenAI).
 
-### Abrir con doble clic
-
-En Finder, abre `ABRIR_LUMINA.command`. El lanzador inicia Lúmina y abre el navegador automáticamente. La ventana de Terminal puede permanecer minimizada; al cerrarla se detiene la aplicación.
-
-La primera vez que lo uses puede tardar un poco más mientras prepara los componentes necesarios.
-
-Para acceder desde otro dispositivo conectado a la misma red, usa `http://nombre-del-mac.local:3000`.
-
-## Instalación permanente en macOS
+### Como app
 
 ```bash
-chmod +x scripts/install-local.sh
-./scripts/install-local.sh
+./scripts/app/install-app.sh
 ```
 
-El instalador actualiza `yt-dlp`, construye la aplicación y registra un LaunchAgent que inicia Lúmina automáticamente al entrar en macOS.
+Esto instala `LUMINA.app` en `/Applications`. Al abrirla, compila el servidor si hace falta, lo arranca y se actualiza sola cuando cambia el código.
 
-## Datos y privacidad
+### Extensión del navegador
 
-- Base de datos: `data/lumina.sqlite`.
-- Claves de Gemini/OpenAI y firma de sesión: `data/secrets.json`, con permisos de propietario.
-- Gemini 3.5 Flash-Lite es el proveedor principal; si no hay clave de Gemini, Lúmina puede usar OpenAI como respaldo.
-- En el nivel gratuito de Gemini, Google puede utilizar el contenido enviado para mejorar sus productos.
-- Copias automáticas y manuales: `backups/`, conservando las siete más recientes.
-- Audio temporal: se elimina inmediatamente después de la transcripción.
-- Los archivos de video nunca se conservan. De X solo se guarda la URL, sus metadatos y una copia del texto público disponible al momento de añadirlo.
+```bash
+npm run extension:build
+```
 
-Para restaurar una copia, detén Lúmina y ejecuta:
+- **Chrome:** abre `chrome://extensions`, activa el modo desarrollador y pulsa «Cargar descomprimida». Elige la carpeta `extension/dist/chrome`.
+- **Firefox:** `npm run extension:sign` crea el `.xpi` firmado. Necesita tus claves de AMO en un archivo `.amo-keys` local, que no se versiona.
+
+## Estructura
+
+```
+app/          Rutas de Next.js (interfaz y API)
+components/   Interfaz en React
+lib/          Lógica: base de datos, IA, búsqueda, espacios, sincronización…
+extension/    Extensión para Chrome y Firefox
+public/m/     App para el celular (PWA)
+scripts/      App de Mac, copias de seguridad, utilidades
+bin/          Ayudantes nativos (Vision, audio)
+tests/        Pruebas
+```
+
+## Privacidad
+
+- **Lo que nunca se versiona** (está en `.gitignore`): la base de datos (`data/`), las claves (`data/secrets.json`), las copias (`backups/`), las claves de firma (`.amo-keys`) y los paquetes compilados.
+- **Las claves de IA** se guardan solo en tu Mac, con permisos de propietario.
+- **El celular y la extensión** se vinculan con un código propio y hablan con tu Mac por la red de casa.
+- **Copias de seguridad automáticas:** se conservan las siete más recientes. Para restaurar una:
 
 ```bash
 npm run restore -- backups/lumina-FECHA.sqlite
 ```
 
-La copia se valida antes de reemplazar la base y la versión anterior se conserva como `backups/pre-restore-*.sqlite`.
-
-## Verificación
+## Desarrollo
 
 ```bash
-npm test
-npm run lint
-npm run build
+npm test          # pruebas
+npm run lint      # estilo
+npm run build     # compilación de producción
 ```
+
+---
+
+<p align="center">Hecho para uso personal · Todos los datos se quedan contigo.</p>

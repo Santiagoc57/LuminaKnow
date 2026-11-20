@@ -1,5 +1,7 @@
 "use client";
 
+import { dailyIdeas, oldUnread } from "@/lib/daily-review";
+import { playSound, setSoundsEnabled, soundsEnabled } from "@/lib/sounds";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -30,6 +32,7 @@ import {
   MessageSquare,
   MoreHorizontal,
   Network,
+  Circle,
   NotebookPen,
   Pencil,
   Pin,
@@ -242,9 +245,10 @@ function LoginScreen({ profiles, onLogin }: { profiles: Profile[]; onLogin: (pro
       <Logo />
       <section className="login-card">
         <div className="login-icon"><Library size={26} /></div>
-        <p className="eyebrow">Bienvenidos de vuelta</p>
-        <h1>¿Quién está entrando?</h1>
-        <div className="profile-picker">
+        {/* Con un solo perfil (lo normal: LUMINA es tuya) no hay nada que elegir: solo el PIN. */}
+        <p className="eyebrow">Bienvenido de vuelta</p>
+        <h1>{profiles.length === 1 ? `Hola, ${profiles[0].name}` : "¿Quién está entrando?"}</h1>
+        {profiles.length > 1 && <div className="profile-picker">
           {profiles.map((profile) => (
             <button key={profile.id} className={selected?.id === profile.id ? "selected" : ""} onClick={() => { setSelected(profile); setPin(""); }}>
               <Avatar profile={profile} />
@@ -252,10 +256,10 @@ function LoginScreen({ profiles, onLogin }: { profiles: Profile[]; onLogin: (pro
               {selected?.id === profile.id && <Check size={16} />}
             </button>
           ))}
-        </div>
+        </div>}
         <form onSubmit={submit}>
           <label>
-            PIN de {selected?.name}
+            {profiles.length === 1 ? "Tu PIN" : `PIN de ${selected?.name}`}
             <input className="pin-input" value={pin} onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 8))} type="password" inputMode="numeric" placeholder="••••" autoFocus />
           </label>
           {error && <p className="form-error"><CircleAlert size={16} /> {error}</p>}
@@ -363,6 +367,7 @@ function AddVideoModal({ tags, onClose, onAdded }: { tags: LibraryTag[]; onClose
     try {
       const endpoint = isX ? "/api/x/threads" : "/api/videos";
       const result = await jsonRequest<{ id: string; duplicate: boolean }>(endpoint, { method: "POST", body: JSON.stringify({ url, additionalUrls: extraUrls, mode, title: title.trim() || undefined, tagIds: selectedSuggestedTags }) });
+      playSound("save");
       onAdded(result.id);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo agregar la fuente.");
@@ -497,7 +502,9 @@ function SettingsModal({ bootstrap, onClose, onSaved }: { bootstrap: Bootstrap; 
           <small className="extension-install-help">Firefox: abre <code>about:debugging</code> → Este Firefox → Cargar complemento temporal. Chrome: descomprime el ZIP y usa <code>chrome://extensions</code> → Cargar descomprimida.</small>
         </div>
         <AppSection />
+        <ICloudSection />
         <MobileSection />
+        <TelegramSection />
         <MaintenanceSection report={bootstrap.maintenance} />
         <div className="settings-section">
           <h3>Tus datos</h3>
@@ -540,13 +547,13 @@ function CommandPalette({ data, onClose, onOpenSource, onOpenCollection, onOpenT
   const parsed = parseLibraryQuery(query);
   const sourceChoices: CommandChoice[] = normalized ? data.videos.filter((video) => matchesLibraryQuery(video, parsed, data.tags)).slice(0, 9).map((video) => ({ id: `source-${video.id}`, label: video.title, detail: `${video.channel || "Fuente guardada"} · ${video.sourceType === "youtube" ? "YouTube" : video.sourceType === "x" ? "X" : video.sourceType === "reddit" ? "Reddit" : "Web"}`, icon: video.sourceType === "youtube" ? <Play size={15} /> : <Link2 size={15} />, run: closeThen(() => onOpenSource(video.id)) })) : [];
   const tagChoices: CommandChoice[] = normalized && !/[#:]/.test(query) ? data.tags.filter((tag) => tag.name.toLocaleLowerCase("es").includes(normalized)).slice(0, 5).map((tag) => ({ id: `tag-${tag.id}`, label: tag.name, detail: tag.level === "primary" ? "Etiqueta principal" : "Subetiqueta", icon: <Hash size={15} />, run: closeThen(() => onOpenTag(tag.id)) })) : [];
-  const collectionChoices: CommandChoice[] = normalized && !/[#:]/.test(query) ? data.collections.filter((collection) => collection.name.toLocaleLowerCase("es").includes(normalized)).slice(0, 5).map((collection) => ({ id: `collection-${collection.id}`, label: collection.name, detail: "Carpeta", icon: <Folder size={15} />, run: closeThen(() => onOpenCollection(collection.id)) })) : [];
+  const collectionChoices: CommandChoice[] = normalized && !/[#:]/.test(query) ? data.collections.filter((collection) => collection.name.toLocaleLowerCase("es").includes(normalized)).slice(0, 5).map((collection) => ({ id: `collection-${collection.id}`, label: collection.name, detail: "Espacio", icon: <Folder size={15} />, run: closeThen(() => onOpenCollection(collection.id)) })) : [];
   const actionChoices = normalized ? baseActions.filter((action) => `${action.label} ${action.detail}`.toLocaleLowerCase("es").includes(normalized)) : baseActions;
   const choices = [...actionChoices, ...sourceChoices, ...tagChoices, ...collectionChoices];
   return <div className="command-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
     <section className="command-palette" role="dialog" aria-modal="true" aria-label="Buscar y ejecutar acciones">
       <div className="command-input"><Search size={18} /><input value={query} onChange={(event) => { setQuery(event.target.value); setActiveIndex(0); }} onKeyDown={(event) => { if (event.key === "Escape") onClose(); if (event.key === "ArrowDown") { event.preventDefault(); setActiveIndex((index) => Math.min(index + 1, choices.length - 1)); } if (event.key === "ArrowUp") { event.preventDefault(); setActiveIndex((index) => Math.max(0, index - 1)); } if (event.key === "Enter" && choices[activeIndex]) { event.preventDefault(); choices[activeIndex].run(); } }} placeholder="Busca o escribe una acción…" autoFocus /><kbd>Esc</kbd></div>
-      <div className="command-hints"><span>#política</span><span>site:youtube.com</span><span>tipo:artículo</span><span>en:&quot;Carpeta&quot;</span></div>
+      <div className="command-hints"><span>#política</span><span>site:youtube.com</span><span>tipo:artículo</span><span>en:&quot;Espacio&quot;</span></div>
       <div className="command-results">{choices.map((choice, index) => <button key={choice.id} className={index === activeIndex ? "active" : ""} onMouseEnter={() => setActiveIndex(index)} onClick={choice.run}><span>{choice.icon}</span><div><strong>{choice.label}</strong><small>{choice.detail}</small></div><ArrowUpRight size={14} /></button>)}{!choices.length && <div className="command-empty"><Search size={20} /><strong>No encontramos coincidencias</strong><small>Prueba otro término u operador.</small></div>}</div>
       <footer><span>↑↓ navegar</span><span>Enter abrir</span><span>Ctrl/⌘ K cerrar</span></footer>
     </section>
@@ -568,9 +575,7 @@ function AppRail({ data, surface, sidebarCollapsed, tagsActive, onAdd, onHome, o
     <button className={`rail-brand rail-tooltip ${surface === "home" || surface === "video" || surface === "collection" ? "active" : ""}`} onClick={onHome} aria-label="Ir al inicio" data-tooltip="Inicio" data-shortcut="⌘1"><span className="brand-mark"><span /></span></button>
     <div className="rail-destinations">
       <button className={`${surface === "ask" || surface === "chat" ? "active " : ""}rail-tooltip`} onClick={onChat} aria-label="Chat con Lúmina" data-tooltip="Chat con Lúmina" data-shortcut="⌘2"><MessageCircle size={19} /></button>
-      <button className={`${surface === "graph" ? "active " : ""}rail-tooltip`} onClick={onGraph} aria-label="Grafo" data-tooltip="Grafo de conocimiento" data-shortcut="⌘3"><Network size={20} /></button>
-      <button className={`${surface === "learning" ? "active " : ""}rail-tooltip`} onClick={onLearning} aria-label="Revisión diaria" data-tooltip="Revisión diaria" data-shortcut="⌘4"><GraduationCap size={20} /></button>
-      <button className={`${surface === "spaces" ? "active " : ""}rail-tooltip`} onClick={onSpaces} aria-label="Carpetas" data-tooltip="Carpetas" data-shortcut=""><Folder size={19} /></button>
+      <button className={`${surface === "spaces" ? "active " : ""}rail-tooltip`} onClick={onSpaces} aria-label="Espacios inteligentes" data-tooltip="Espacios inteligentes" data-shortcut=""><Circle size={19} /></button>
       {tagPanel && <div className="rail-popover-anchor">
         <button className={`${tagsOpen || tagsActive ? "active " : ""}rail-tooltip`} onClick={(event) => { const rect = event.currentTarget.getBoundingClientRect(); setTagsOpen((current) => current ? null : rect); }} aria-label="Etiquetas" aria-expanded={Boolean(tagsOpen)} data-tooltip="Etiquetas" data-shortcut=""><Hash size={19} /></button>
         {tagsOpen && popover(tagsOpen, "rail-tags-popover", () => setTagsOpen(null), tagPanel(() => setTagsOpen(null)))}
@@ -588,7 +593,9 @@ function AppRail({ data, surface, sidebarCollapsed, tagsActive, onAdd, onHome, o
         <strong>{data.profile.name}</strong>
         <small>Uso de IA este mes · US${data.usage.cost.toFixed(2)}</small>
         <button role="menuitem" onClick={() => { setProfileOpen(null); onSettings(); }}><Settings size={15} /> Ajustes</button>
-        <button role="menuitem" onClick={() => { setProfileOpen(null); onLogout(); }}><LogOut size={15} /> Cambiar perfil</button>
+        <button role="menuitem" onClick={() => { setProfileOpen(null); onGraph(); }}><Network size={15} /> Grafo de conocimiento</button>
+        <button role="menuitem" onClick={() => { setProfileOpen(null); onLearning(); }}><GraduationCap size={15} /> Revisión diaria</button>
+        <button role="menuitem" onClick={() => { setProfileOpen(null); onLogout(); }}><LogOut size={15} /> Cerrar sesión</button>
       </>, true)}
     </div>
   </nav>;
@@ -621,10 +628,10 @@ type MobileStatus = { connected: boolean; appUrl: string; certUrl: string; https
 // Celular Android: app instalable que aparece en «Compartir» y envía a esta Mac por la Wi-Fi de casa.
 // LUMINA como app: el icono en Aplicaciones y, si quieres, que arranque sola al iniciar sesión.
 function AppSection() {
-  const [state, setState] = useState<{ enabled: boolean; appInstalled: boolean } | null>(null);
+  const [state, setState] = useState<{ enabled: boolean; appInstalled: boolean; addresses?: string[] } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  useEffect(() => { void jsonRequest<{ enabled: boolean; appInstalled: boolean }>("/api/settings/autostart").then(setState).catch(() => setState(null)); }, []);
+  useEffect(() => { void jsonRequest<{ enabled: boolean; appInstalled: boolean; addresses?: string[] }>("/api/settings/autostart").then(setState).catch(() => setState(null)); }, []);
   const toggle = async (enabled: boolean) => {
     setBusy(true); setError("");
     try { setState(await jsonRequest("/api/settings/autostart", { method: "POST", body: JSON.stringify({ enabled }) })); }
@@ -636,6 +643,90 @@ function AppSection() {
     <p className="settings-help">{state?.appInstalled ? "Abre «LUMINA» desde Aplicaciones (o arrástrala al Dock): arranca sola si no está corriendo y se abre en su propia ventana, sin Terminal." : "La app aún no está instalada en Aplicaciones."}</p>
     <label className="settings-check"><input type="checkbox" disabled={busy || !state} checked={Boolean(state?.enabled)} onChange={(event) => void toggle(event.target.checked)} /> Abrir LUMINA en segundo plano al iniciar sesión</label>
     <small className="settings-help">Así tu celular y la extensión la encuentran aunque no hayas abierto la ventana. Puedes desactivarlo cuando quieras.</small>
+    <SoundsToggle />
+    {state?.addresses?.length ? <div className="settings-other-mac">
+      <strong>En otro Mac de la casa</strong>
+      <ol>
+        <li>Desde ese Mac, descarga la app: <a href={`http://${state.addresses[0]}/downloads/LUMINA-mac.zip`}>{`http://${state.addresses[0]}/downloads/LUMINA-mac.zip`}</a></li>
+        <li>Descomprímela, pásala a Aplicaciones y ábrela con clic derecho → Abrir (solo la primera vez).</li>
+        <li>Cuando pregunte la dirección, escribe <code>{state.addresses[0]}</code></li>
+      </ol>
+      <small className="settings-help">Usa la biblioteca de este Mac (no es una copia), así que este Mac tiene que estar encendido y en la misma red. También puedes abrir <code>{`http://${state.addresses[0]}`}</code> en cualquier navegador.{state.addresses.length > 1 ? ` Otras direcciones de este Mac: ${state.addresses.slice(1).join(", ")}.` : ""}</small>
+    </div> : null}
+    {error && <p className="lv-error">{error}</p>}
+  </div>;
+}
+
+function SoundsToggle() {
+  const [on, setOn] = useState(() => soundsEnabled());
+  return <label className="settings-check"><input type="checkbox" checked={on} onChange={(event) => { setSoundsEnabled(event.target.checked); setOn(event.target.checked); if (event.target.checked) playSound("done"); }} /> Sonidos suaves al guardar, marcar como leído, fijar y archivar</label>;
+}
+
+// Sincronización por turnos con iCloud Drive entre tus Mac.
+type SyncStatus = { available: boolean; enabled: boolean; machine: string; localVersion: number; cloud: { version: number; machine: string; savedAt: string } | null; syncedAt: string; lastError: string; conflicts: string[] };
+function ICloudSection() {
+  const [status, setStatus] = useState<SyncStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { void jsonRequest<SyncStatus>("/api/settings/sync").then(setStatus).catch(() => setStatus(null)); }, []);
+  const act = async (action: "enable" | "disable" | "sync") => {
+    if (action === "enable" && !window.confirm("¿Sincronizar LUMINA con tu iCloud Drive? Se guarda una copia de tu biblioteca (y de tus claves de IA) en la carpeta LUMINA de iCloud, para abrirla en tu otro Mac.")) return;
+    setBusy(true);
+    try { setStatus(await jsonRequest<SyncStatus>("/api/settings/sync", { method: "POST", body: JSON.stringify({ action }) })); } finally { setBusy(false); }
+  };
+  if (!status) return null;
+  const when = (iso: string) => iso ? new Date(iso).toLocaleString("es", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+  return <div className="settings-section">
+    <h3>Sincronizar con iCloud</h3>
+    {!status.available ? <p className="settings-help">Activa iCloud Drive en Ajustes del Sistema → tu nombre → iCloud para usar LUMINA en tus otros Mac.</p> : <>
+      <p className="settings-help">Usa LUMINA en tus Mac aunque este esté apagado. Los cambios suben a iCloud al momento (cada minuto y al cerrar) y el otro Mac los baja al abrirse. Funciona mejor usándola en un Mac a la vez.</p>
+      <label className="settings-check"><input type="checkbox" disabled={busy} checked={status.enabled} onChange={(event) => void act(event.target.checked ? "enable" : "disable")} /> Sincronizar este Mac ({status.machine})</label>
+      {status.enabled && <small className="settings-help">{status.cloud ? `Última versión en iCloud: ${when(status.cloud.savedAt)}, desde ${status.cloud.machine}.` : "Aún no hay copia en iCloud."}{status.syncedAt ? ` Este Mac se sincronizó ${when(status.syncedAt)}.` : ""} <button className="link-button" disabled={busy} onClick={() => void act("sync")}>{busy ? "Sincronizando…" : "Sincronizar ahora"}</button></small>}
+      {status.lastError && <p className="lv-error">No se pudo sincronizar: {status.lastError}</p>}
+      {status.conflicts.length > 0 && <small className="settings-help">Usaste dos Mac a la vez sin sincronizar: se conservó la versión de este Mac y la otra quedó guardada en data/conflictos ({status.conflicts.slice(-1)[0]}).</small>}
+      <small className="settings-help">Para instalarla en otro Mac: activa esto aquí, y en el otro Mac abre iCloud Drive → LUMINA → «Instalar LUMINA».</small>
+    </>}
+  </div>;
+}
+
+// Guardar desde Telegram con un bot propio.
+type TelegramStatus = { connected: boolean; username: string; paired: boolean; running: boolean; lastError: string; pairCode: string };
+function TelegramSection() {
+  const [status, setStatus] = useState<TelegramStatus | null>(null);
+  const [token, setToken] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => { void jsonRequest<TelegramStatus>("/api/settings/telegram").then(setStatus).catch(() => setStatus(null)); }, []);
+  // Mientras esperas a vincular, se refresca solo.
+  useEffect(() => {
+    if (!status?.connected || status.paired) return;
+    const timer = window.setInterval(() => { void jsonRequest<TelegramStatus>("/api/settings/telegram").then(setStatus).catch(() => undefined); }, 3000);
+    return () => window.clearInterval(timer);
+  }, [status?.connected, status?.paired]);
+  const act = async (body: Record<string, unknown>) => {
+    setBusy(true); setError("");
+    try { setStatus(await jsonRequest<TelegramStatus>("/api/settings/telegram", { method: "POST", body: JSON.stringify(body) })); setToken(""); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "No se pudo."); }
+    finally { setBusy(false); }
+  };
+  if (!status) return null;
+  return <div className="settings-section">
+    <h3>Guardar desde Telegram</h3>
+    {!status.connected ? <>
+      <p className="settings-help">Reenvía enlaces, fotos o texto a tu propio bot de Telegram y entran a LUMINA, también fuera de casa (con este Mac encendido).</p>
+      <ol className="settings-steps">
+        <li>En Telegram, abre <b>@BotFather</b> y escribe <code>/newbot</code>. Ponle un nombre (por ejemplo «Mi Lúmina»).</li>
+        <li>Te dará una clave como <code>123456:ABC…</code>. Pégala aquí:</li>
+      </ol>
+      <div className="settings-inline"><input value={token} onChange={(event) => setToken(event.target.value)} placeholder="Clave del bot" type="password" autoComplete="off" /><button className="primary-button" disabled={busy || !token.trim()} onClick={() => void act({ action: "connect", token })}>{busy ? "Conectando…" : "Conectar"}</button></div>
+    </> : !status.paired ? <>
+      <p className="settings-help">Bot conectado{status.username ? <>: <b>@{status.username}</b></> : ""}. Ahora ábrelo en Telegram y envíale este código:</p>
+      {status.pairCode ? <p className="settings-code">{status.pairCode}</p> : <button className="secondary-button" disabled={busy} onClick={() => void act({ action: "pair" })}>Generar código</button>}
+      <small className="settings-help">Solo el chat que envíe el código podrá guardar en tu LUMINA. Caduca en 15 minutos.</small>
+    </> : <>
+      <p className="settings-help">✓ Listo. Reenvía a <b>@{status.username || "tu bot"}</b> enlaces (YouTube, X, artículos…), fotos o texto y se guardan aquí. Te responde cuando está guardado.</p>
+      {status.lastError && <small className="settings-help">Último problema al hablar con Telegram: {status.lastError}</small>}
+    </>}
+    {status.connected && <button className="link-button" disabled={busy} onClick={() => { if (window.confirm("¿Desconectar el bot de Telegram?")) void act({ action: "disconnect" }); }}>Desconectar</button>}
     {error && <p className="lv-error">{error}</p>}
   </div>;
 }
@@ -695,6 +786,8 @@ function MaintenanceSection({ report }: { report?: Bootstrap["maintenance"] }) {
   const archive = async (id: string) => { await jsonRequest(`/api/videos/${id}`, { method: "PATCH", body: JSON.stringify({ action: "archive" }) }); setArchived((current) => new Set([...current, id])); };
   type TagSide = { id: string; name: string; uses: number; catalog: boolean };
   const [similar, setSimilar] = useState<Array<{ keep: TagSide; merge: TagSide; reason: string; done?: string }> | null>(null);
+  const [retitled, setRetitled] = useState<Array<{ id: string; before: string; after: string }> | null>(null);
+  const improveTitles = async () => { setBusy("titles"); try { setRetitled((await jsonRequest<{ changed: NonNullable<typeof retitled> }>("/api/maintenance", { method: "POST", body: JSON.stringify({ action: "retitle" }) })).changed); } finally { setBusy(""); } };
   const findSimilar = async () => { setBusy("tags"); try { setSimilar((await jsonRequest<{ pairs: NonNullable<typeof similar> }>("/api/maintenance", { method: "POST", body: JSON.stringify({ action: "similar-tags" }) })).pairs); } finally { setBusy(""); } };
   // Une «merge» en «keep»; el botón ⇄ invierte cuál se conserva (salvo si la otra es del catálogo).
   const mergePair = async (index: number, keep: TagSide, merge: TagSide) => {
@@ -716,8 +809,10 @@ function MaintenanceSection({ report }: { report?: Bootstrap["maintenance"] }) {
       <button className="secondary-button" disabled={Boolean(busy)} onClick={() => void checkLinks()}>{busy === "links" ? "Revisando enlaces… (puede tardar)" : "Revisar enlaces rotos"}</button>
       <button className="secondary-button" disabled={Boolean(busy) || Boolean(retag?.running)} onClick={() => void startRetag()}>{retag?.running ? `Reetiquetando… ${retag.done}/${retag.total}` : "Reetiquetar con IA"}</button>
       <button className="secondary-button" disabled={Boolean(busy)} onClick={() => void saveCopies()}>{busy === "copies" ? "Guardando copias…" : "Guardar copias de las webs"}</button>
+      <button className="secondary-button" disabled={Boolean(busy)} onClick={() => void improveTitles()} title="Tweets, capturas y webs con título de relleno reciben un título que dice de qué tratan">{busy === "titles" ? "Escribiendo títulos…" : "Mejorar títulos"}</button>
       <button className="secondary-button" disabled={Boolean(busy)} onClick={() => void findSimilar()}>{busy === "tags" ? "Buscando…" : "Etiquetas parecidas"}</button>
     </div>
+    {retitled && (retitled.length ? <div className="lv-maint-group"><strong>Títulos nuevos</strong><ul>{retitled.map((item) => <li key={item.id}><span>{item.after}</span><small>antes: {item.before.slice(0, 80)}</small></li>)}</ul></div> : <small>Todos los títulos ya están bien.</small>)}
     {similar && (similar.length ? <div className="lv-maint-group"><strong>Etiquetas que dicen casi lo mismo</strong><ul>{similar.map((pair, index) => <li key={`${pair.keep.id}-${pair.merge.id}`} className={pair.done ? "done" : ""}>
       <span>«{pair.merge.name}» <small>({pair.merge.uses})</small> → «{pair.keep.name}»{pair.keep.catalog ? " ◆" : ""} <small>({pair.keep.uses})</small></span>
       <small>{pair.reason}</small>
@@ -822,6 +917,32 @@ function AiIssuesPanel({ videos, lastError, onOpen, onRetried }: { videos: AppVi
 }
 
 // «Tu semana»: un resumen local (sin IA, sin costo) de lo que guardaste y de lo que conviene retomar.
+// «Hoy»: ideas para repasar (cambian cada día) y lo que lleva más de un mes sin leer.
+function TodayPanel({ videos, onOpen, onChanged }: { videos: AppVideo[]; onOpen: (id: string) => void; onChanged: () => Promise<void> }) {
+  const [now] = useState(() => Date.now());
+  const ideas = dailyIdeas(videos, new Date(now));
+  const pending = oldUnread(videos, now);
+  const [done, setDone] = useState<Record<string, string>>({});
+  const act = async (id: string, action: "consume" | "archive") => {
+    await jsonRequest(`/api/videos/${id}`, { method: "PATCH", body: JSON.stringify({ action }) });
+    setDone((current) => ({ ...current, [id]: action === "consume" ? "Leído" : "Archivado" }));
+    void onChanged();
+  };
+  const months = (value: string) => { const count = Math.floor((now - new Date(value).getTime()) / (30 * 86_400_000)); return count <= 1 ? "hace un mes" : `hace ${count} meses`; };
+  return <div className="rail-list today-panel">
+    <header><strong>Para repasar hoy</strong><small>{ideas.length ? "Ideas tuyas de lo que has guardado. Mañana serán otras." : "Subraya frases en tus fuentes y aparecerán aquí para repasarlas."}</small></header>
+    {ideas.length > 0 && <div className="today-ideas">{ideas.map((idea) => <button key={`${idea.videoId}-${idea.quote.slice(0, 20)}`} onClick={() => onOpen(idea.videoId)}>
+      <blockquote>{idea.quote.length > 260 ? `${idea.quote.slice(0, 257)}…` : idea.quote}</blockquote>
+      {idea.note && <em>{idea.note}</em>}
+      <small>{idea.kind === "highlight" ? "Tu subrayado" : "Idea clave"} · {idea.title}</small>
+    </button>)}</div>}
+    {pending.length > 0 && <><h4>Sin leer desde hace tiempo · {pending.length}</h4><ul className="today-pending">{pending.slice(0, 6).map((video) => <li key={video.id}>
+      <button className="today-open" onClick={() => onOpen(video.id)}><span className="rail-list-thumb" style={video.thumbnailUrl ? { backgroundImage: `url(${video.thumbnailUrl})` } : undefined} /><span><strong>{video.title}</strong><small>Guardado {months(video.createdAt)}</small></span></button>
+      {done[video.id] ? <span className="today-done">{done[video.id]}</span> : <span className="today-actions"><button onClick={() => void act(video.id, "consume")} title="Ya lo leí">Leído</button><button onClick={() => void act(video.id, "archive")} title="Archivar: deja de estorbar, pero sigue buscable">Archivar</button></span>}
+    </li>)}</ul></>}
+  </div>;
+}
+
 function ShelfPanel({ videos, onOpen }: { videos: AppVideo[]; onOpen: (id: string) => void }) {
   return <div className="rail-list">
     <header><strong>En mente</strong><small>Lo que fijaste con el alfiler, a mano mientras lo necesites.</small></header>
@@ -849,7 +970,7 @@ function LibraryScopeNavigation({ data, libraryScope, onLibraryScope, placement 
   onLibraryScope: (scope: Exclude<LibraryScope, null>) => void;
   placement?: "top" | "sidebar";
 }) {
-  // En una carpeta, los conteos son los de la carpeta y no tienen sentido «Sin clasificar» ni «Archivados».
+  // En un espacio, los conteos son los del espacio y no tienen sentido «Sin clasificar» ni «Archivados».
   const videos = pool ?? data.videos;
   const items = [
     { id: "all" as const, label: "Toda la biblioteca", icon: <Library size={15} />, count: videos.length },
@@ -927,6 +1048,7 @@ export function LuminaApp({ initialSurface = "home", initialConversationId = nul
   const [activeConversationId, setActiveConversationId] = useState<string | null>(initialConversationId);
   const [addOpen, setAddOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [appNow] = useState(() => Date.now());
   const [commandOpen, setCommandOpen] = useState(false);
   const [taxonomyMigrationOpen, setTaxonomyMigrationOpen] = useState(false);
   const [activeCollection, setActiveCollection] = useState<string | null>(null);
@@ -1070,7 +1192,7 @@ export function LuminaApp({ initialSurface = "home", initialConversationId = nul
           // Todo (videos y artículos incluidos) se abre en el panel sobre la biblioteca; ya no hay página completa.
           setPreviewId(videoId); setSelectedId(null); setActiveCollection(null); setActiveTag(null); setSurface("home"); return;
         }
-        // Los enlaces antiguos a una carpeta la abren con el aspecto de carpeta inteligente.
+        // Los enlaces antiguos a un espacio la abren con el aspecto de espacio inteligente.
         if (collectionId) { setActiveCollection(null); setSelectedId(null); setActiveTag(null); setLibraryScope("all"); setActiveSpaceId(collectionId); setSurface("home"); return; }
         setSelectedId(null); setActiveCollection(null); setActiveTag(null);
         const view = params.get("view");
@@ -1090,7 +1212,15 @@ export function LuminaApp({ initialSurface = "home", initialConversationId = nul
   }, [loadBootstrap]);
 
   if (phase === "loading" && startupError) return <main className="app-loading startup-failure"><Logo /><CircleAlert size={24} /><strong>No pudimos iniciar Lúmina</strong><p>{startupError}</p><button className="primary-button" onClick={() => { setStartupError(""); void loadSetup().catch((cause) => setStartupError(cause instanceof Error ? cause.message : "No pudimos iniciar Lúmina.")); }}><RefreshCw size={16} /> Reintentar</button></main>;
-  if (phase === "loading") return <main className="app-loading"><Logo /><LoaderCircle className="spin" size={24} /></main>;
+  // Mientras carga: la forma de la pantalla (riel, buscador y tarjetas), en vez de una rueda girando.
+  if (phase === "loading") return <main className="app-skeleton" aria-busy="true" aria-label="Cargando tu biblioteca">
+    <aside><i className="logo" />{Array.from({ length: 7 }, (_, index) => <i key={index} />)}</aside>
+    <section>
+      <div className="sk-search" />
+      <div className="sk-chips">{Array.from({ length: 4 }, (_, index) => <span key={index} />)}</div>
+      <div className="sk-grid">{[220, 160, 260, 190, 240, 170, 210, 280, 150, 230].map((height, index) => <span key={index} style={{ height }} />)}</div>
+    </section>
+  </main>;
   if (phase === "setup") return <SetupScreen onReady={() => void loadSetup()} />;
   if (phase === "login") return <LoginScreen profiles={profiles} onLogin={async (profileId, pin) => { await jsonRequest("/api/auth/login", { method: "POST", body: JSON.stringify({ profileId, pin }) }); await loadBootstrap(); }} />;
   if (!data) return null;
@@ -1100,7 +1230,7 @@ export function LuminaApp({ initialSurface = "home", initialConversationId = nul
   const openLibrarySource = (id: string) => {
     setPreviewId(id);
   };
-  // Las carpetas se abren con el aspecto de los espacios inteligentes.
+  // Los espacios se abren con el aspecto de los espacios inteligentes.
   const openCollection = (id: string) => { openSpace(id); };
   const openConversation = (id: string) => {
     setActiveConversationId(id); setSurface("chat"); setActiveCollection(null); setActiveTag(null); setSelectedId(null); setVideoChatOpen(false); setMobileSidebar(false);
@@ -1118,7 +1248,7 @@ export function LuminaApp({ initialSurface = "home", initialConversationId = nul
   const goSpaces = () => leaveTo("spaces", "/?view=spaces");
   const goSerendipity = () => leaveTo("serendipity", "/?view=casualidad");
   const openSpace = (id: string) => { leaveTo("home", `/?space=${encodeURIComponent(id)}`); setActiveSpaceId(id); setLibraryScope("all"); setActiveTagIds([]); };
-  const deleteSpace = async (id: string) => { if (!window.confirm("¿Eliminar esta carpeta? Tus fuentes no se borran.")) return; await jsonRequest(`/api/spaces/${id}`, { method: "DELETE" }); await loadBootstrap(); if (activeSpaceId === id) goHome(); };
+  const deleteSpace = async (id: string) => { if (!window.confirm("¿Eliminar este espacio? Tus fuentes no se borran.")) return; await jsonRequest(`/api/spaces/${id}`, { method: "DELETE" }); await loadBootstrap(); if (activeSpaceId === id) goHome(); };
   const openVibe = async (video: AppVideo) => {
     const { similar } = await jsonRequest<{ similar: Array<{ id: string }> }>(`/api/videos/${video.id}/similar`);
     leaveTo("home", "/"); setPreviewId(null); setLibraryScope("all"); setActiveTagIds([]);
@@ -1186,7 +1316,7 @@ export function LuminaApp({ initialSurface = "home", initialConversationId = nul
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", finish);
   };
-  // Dentro de una carpeta, los tipos (Videos, Publicaciones…) filtran la carpeta en vez de sacarte de ella.
+  // Dentro de un espacio, los tipos (Videos, Publicaciones…) filtran el espacio en vez de sacarte de ella.
   const chooseLibraryScope = (scope: Exclude<LibraryScope, null>) => {
     if (activeSpaceId && scope !== "archived" && scope !== "unsorted") { setLibraryScope(scope); return; }
     setHomeVibe(null); setActiveSpaceId(null); setLibraryScope(scope); setActiveCollection(null); setActiveTag(null); setSurface("home"); setSelectedId(null); setMobileSidebar(false);
@@ -1205,7 +1335,7 @@ export function LuminaApp({ initialSurface = "home", initialConversationId = nul
       {(surface === "home" || surface === "ask") && <KnowledgeHome key={`home-${surface}-${libraryScope}-${activeSpace?.id || ""}-${homeSearch.run}`} initialQuery={homeSearch.query} onSearchQuery={searchLibrary} spaces={data.spaces} activeSpace={activeSpace} onOpenSpace={openSpace} onDeleteSpace={(id) => void deleteSpace(id)} onSpaceCreated={(space) => void loadBootstrap().then(() => openSpace(space.id))} onClearSpace={goHome} scopeActive={libraryScope !== "all" && libraryScope !== null} onPreview={(id, sequence) => { setPreviewId(id); setPreviewSequence(sequence ?? []); }} onAskSource={askSource} profileId={data.profile.id} videos={homeVibe ? data.videos.filter((video) => homeVibe.ids.includes(video.id)) : activeSpace ? folderScopedVideos : visibleLibraryVideos} shelf={libraryScope === "all" && !activeTagIds.length ? data.videos.filter((video) => video.topPosition !== null && video.topPosition !== undefined).sort((a, b) => (a.topPosition ?? 0) - (b.topPosition ?? 0)) : []} vibe={homeVibe} onVibe={(video) => void openVibe(video)} onClearVibe={goHome} collections={data.collections} tags={data.tags} models={data.models} libraryNavigation={<LibraryScopeNavigation data={data} libraryScope={libraryScope} onLibraryScope={chooseLibraryScope} placement="top" pool={activeSpace ? folderVideos : undefined} />} initialTagId={activeTag} initialMode={surface === "ask" ? "ask" : "overview"} onModeChange={(mode) => { setSurface(mode === "ask" ? "ask" : "home"); const path = mode === "ask" ? "/?view=ask" : "/"; if (`${window.location.pathname}${window.location.search}` !== path) window.history.pushState({}, "", path); }} onAdd={() => setAddOpen(true)} onOpenVideo={openVideo} onOpenConversation={openConversation} onConversationChanged={() => void loadConversations()} onRefresh={async () => { await loadBootstrap(); }} />}
       {surface === "graph" && <GraphWorkspace collections={data.collections} tags={data.tags} onOpenVideo={openLibrarySource} />}
       {surface === "learning" && <DailyReview videos={data.videos} catalog={data.tags} collections={data.collections} spaces={data.spaces} onChanged={async () => { await loadBootstrap(); }} onOpenVideo={openVideo} />}
-      {surface === "spaces" && <SpacesWorkspace spaces={data.spaces} videos={data.videos} tags={data.tags} onOpenSpace={openSpace} onChanged={async () => { await loadBootstrap(); }} />}
+      {surface === "spaces" && <SpacesWorkspace spaces={data.spaces} videos={data.videos} tags={data.tags} onOpenSpace={openSpace} onChat={(space) => newChat({ collectionIds: [space.id], tagIds: [], videoIds: [], excludedVideoIds: [] })} onOpenSource={(id) => setPreviewId(id)} onChanged={async () => { await loadBootstrap(); }} />}
       {surface === "serendipity" && <SerendipityWorkspace videos={data.videos} catalog={data.tags} collections={data.collections} spaces={data.spaces} onSearch={searchLibrary} onVibe={(video) => void openVibe(video)} onChanged={async () => { await loadBootstrap(); }} onExit={goHome} onAsk={askSource} />}
       {previewId && <DetailModal key={previewId} videoId={previewId} sequence={previewSequence} catalog={data.tags} collections={data.collections} spaces={data.spaces} onSearch={searchLibrary} onVibe={(video) => void openVibe(video)} onClose={() => setPreviewId(null)} onChanged={async () => { await loadBootstrap(); }} onAsk={askSource} />}
       {surface === "chat" && <UnifiedChatWorkspace key={activeConversationId || "new-chat"} conversationId={activeConversationId} videos={data.videos} collections={data.collections} tags={data.tags} models={data.models} initialSelection={newChatSelection} onOpenConversation={openConversation} onConversationChanged={() => void loadConversations()} />}

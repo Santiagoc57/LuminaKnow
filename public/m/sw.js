@@ -1,7 +1,7 @@
 /* Service worker de LUMINA en el celular: recibe lo compartido aunque la Mac no esté al alcance. */
 importScripts("/m/core.js");
 
-const CACHE = "lumina-m-v5";
+const CACHE = "lumina-m-v6";
 const SHELL = ["/m/index.html", "/m/app.js", "/m/core.js", "/m/app.css", "/m/manifest.webmanifest", "/m/icon-192.png", "/m/icon-512.png"];
 
 self.addEventListener("install", (event) => {

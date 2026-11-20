@@ -97,3 +97,11 @@ textarea { width: 100%; padding: 12px 14px; border: 1px solid var(--line); borde
 
 .a h4 { margin: 10px 0 6px; font-size: 14px; }
 .a h4:first-child { margin-top: 0; }
+
+/* Para repasar hoy */
+.daily h2 { margin-bottom: 8px; }
+.daily-row { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px; padding: 0 16px 4px; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.daily-row::-webkit-scrollbar { display: none; }
+.daily-card { flex: none; width: 78%; scroll-snap-align: start; display: grid; gap: 8px; align-content: start; padding: 14px; border-radius: 16px; background: var(--card); color: var(--ink); text-align: left; font-weight: 400; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.daily-card blockquote { margin: 0; padding-left: 10px; border-left: 3px solid var(--accent); font-size: 14px; line-height: 1.45; }
+.daily-card small { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

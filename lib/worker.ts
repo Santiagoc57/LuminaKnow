@@ -1,3 +1,4 @@
+import { prefersAIHeadline } from "./headline";
 import { getDb, refreshVideoSearch } from "./db";
 import { currentEmbeddingModel, embedTexts, getAIProvider, summarizeVideo, transcribeFiles } from "./ai";
 import { chunkCues, friendlyJobError, makeId } from "./utils";
@@ -121,6 +122,11 @@ async function analyze(videoId: string, cues: TranscriptCue[], metadata: { title
   replaceChunks(videoId, chunks, embeddings);
   updateVideo(videoId, "summarizing");
   const { summary, tags: summaryTags, topics, entities, relations } = await summarizeVideo(metadata.title, metadata.channel, metadata.description, chunks, sourceType);
+  // Título claro escrito por la IA donde la fuente no trae uno útil (sin tocar lo que hayas renombrado tú).
+  if (summary.headline) {
+    const row = getDb().prepare("SELECT url, youtube_id AS sourceId, custom_title AS customTitle FROM videos WHERE id = ?").get(videoId) as { url: string; sourceId: string; customTitle: string } | undefined;
+    if (row && !row.customTitle && prefersAIHeadline({ sourceType, title: metadata.title, url: row.url, sourceId: row.sourceId })) updateVideo(videoId, "summarizing", { title: summary.headline });
+  }
   // Con OpenAI, las etiquetas del catálogo las decide la API Decisions (probabilidad por etiqueta, con umbral).
   const decided = await decideCatalogTags({ title: metadata.title, author: metadata.channel, summary: [summary.gist, summary.cardSummary].filter(Boolean).join(" "), content: chunks.map((chunk) => chunk.text).join("\n") }).catch(() => null);
   const tags = decided?.length ? decided : summaryTags;
@@ -204,16 +210,18 @@ async function runLocalItemsJob(jobId: string, videoId: string) {
 
 async function runWebArticleJob(jobId: string, videoId: string) {
   const db = getDb();
-  const video = db.prepare("SELECT url FROM videos WHERE id = ?").get(videoId) as { url: string } | undefined;
+  const video = db.prepare("SELECT url, thumbnail_url AS thumbnailUrl FROM videos WHERE id = ?").get(videoId) as { url: string; thumbnailUrl: string } | undefined;
   if (!video) return;
   updateJob(jobId, "running");
   updateVideo(videoId, "extracting", { error: "" });
   const article = await extractWebArticle(video.url);
+  // Si al guardar se tomó una captura de la página (o pusiste tú la portada), se conserva.
+  const keptCover = /^\/api\/media\/cover_/.test(video.thumbnailUrl || "") ? video.thumbnailUrl : "";
   updateVideo(videoId, "indexing", {
     title: article.title,
     channel: article.channel,
     description: article.description,
-    thumbnail_url: article.thumbnailUrl,
+    thumbnail_url: keptCover || article.thumbnailUrl,
     source_published_at: article.publishedAt,
     source_language: article.sourceLanguage,
     transcript_source: `${article.sourceKind}-readability`,
@@ -229,7 +237,7 @@ async function runWebArticleJob(jobId: string, videoId: string) {
     article.sections.forEach((section, index) => insert.run(
       makeId("item"), videoId, section.externalId, index, section.url,
       article.author || article.siteName, section.text, article.publishedAt,
-      index === 0 ? article.thumbnailUrl : "",
+      index === 0 ? keptCover || article.thumbnailUrl : "",
       JSON.stringify({ heading: section.heading, siteName: article.siteName, sourceKind: article.sourceKind, language: article.sourceLanguage, faviconUrl: article.faviconUrl, ...(index === 0 && article.product ? { product: { price: article.product.price, currency: article.product.currency, brand: article.product.brand } } : {}), ...(index === 0 && article.movie ? { movie: article.movie } : {}) }),
       new Date().toISOString(),
     ));

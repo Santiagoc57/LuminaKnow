@@ -4,7 +4,7 @@ import { getDb } from "./db";
 const TOKEN_PREFIX = "lumina_ext_";
 
 // Cada cliente (la extensión del navegador, OpenClip…) tiene su propio código: revocar uno no desconecta los demás.
-export type ExtensionClient = "browser" | "openclip" | "mobile";
+export type ExtensionClient = "browser" | "openclip" | "mobile" | "telegram";
 
 function tokenSettingKey(profileId: string, client: ExtensionClient = "browser") {
   return client === "browser" ? `extension_token_hash:${profileId}` : `extension_token_hash:${profileId}:${client}`;
@@ -34,7 +34,7 @@ export function profileForExtensionToken(token: string | null) {
   if (!token?.startsWith(TOKEN_PREFIX)) return null;
   const parts = token.slice(TOKEN_PREFIX.length).split(".");
   const encodedProfile = parts[0];
-  const client: ExtensionClient = parts.length === 3 && (parts[1] === "openclip" || parts[1] === "mobile") ? parts[1] : "browser";
+  const client: ExtensionClient = parts.length === 3 && (parts[1] === "openclip" || parts[1] === "mobile" || parts[1] === "telegram") ? parts[1] : "browser";
   if (!encodedProfile) return null;
   let profileId = "";
   try { profileId = Buffer.from(encodedProfile, "base64url").toString("utf8"); } catch { return null; }

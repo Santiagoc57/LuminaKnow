@@ -5,6 +5,7 @@ import { getDb } from "./db";
 import { listVideos } from "./data";
 import { listSmartSpaces } from "./spaces";
 import { spaceQueryMatches } from "./library-query";
+import { dailyIdeas } from "./daily-review";
 import type { AppVideo, LibraryTag } from "./types";
 
 // Copia ligera de la biblioteca para el celular: lo necesario para buscar y leer sin conexión
@@ -89,6 +90,8 @@ export function mobileLibrary() {
   return {
     generatedAt: new Date().toISOString(),
     folders: folders.map((folder) => ({ id: folder.id, name: folder.name, color: folder.color })),
+    // Ideas para repasar hoy (las mismas que en el Mac).
+    daily: dailyIdeas(videos).map((idea) => ({ id: idea.videoId, title: idea.title, quote: idea.quote, note: idea.note, kind: idea.kind })),
     items: videos.map((video) => toMobileItem(video, membership.get(video.id) ?? [])),
   };
 }

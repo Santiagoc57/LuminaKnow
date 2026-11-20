@@ -6,6 +6,7 @@ import { apiError } from "@/lib/http";
 import { checkLinks, findDuplicates, listLinkProblems } from "@/lib/maintenance";
 import { backfillSnapshots } from "@/lib/snapshots";
 import { mergeTags, similarTagPairs } from "@/lib/tag-merge";
+import { retitleLibrary } from "@/lib/retitle";
 
 // Mantenimiento de la biblioteca: duplicados y enlaces rotos.
 export async function GET() {
@@ -19,7 +20,8 @@ export async function POST(request: Request) {
   try {
     await requireProfile();
     const body = await request.json();
-    const { action } = z.object({ action: z.enum(["check-links", "snapshots", "retag", "retag-status", "similar-tags", "merge-tags"]) }).parse(body);
+    const { action } = z.object({ action: z.enum(["check-links", "snapshots", "retag", "retag-status", "similar-tags", "merge-tags", "retitle"]) }).parse(body);
+    if (action === "retitle") return NextResponse.json({ changed: await retitleLibrary() });
     if (action === "similar-tags") return NextResponse.json({ pairs: similarTagPairs() });
     if (action === "merge-tags") {
       const { keepId, mergeId } = z.object({ keepId: z.string().min(1), mergeId: z.string().min(1) }).parse(body);

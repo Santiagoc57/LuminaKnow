@@ -758,8 +758,15 @@ function migrateConnectedKnowledge(db: Database.Database) {
   `).run();
 }
 
+// Las migraciones se revisan una vez por carga del módulo (también tras recargar el código en desarrollo),
+// no en cada consulta: antes, cargar miles de fuentes las repetía miles de veces.
+let migrationsChecked = false;
+
 export function getDb() {
+  if (global.__luminaDb && migrationsChecked) return global.__luminaDb;
   if (global.__luminaDb) {
+    migrationsChecked = true;
+    try {
     migrateSavedVideos(global.__luminaDb);
     migrateSourceTypes(global.__luminaDb);
     if (!hasTable(global.__luminaDb, "conversation_contexts")) migrateConnectedKnowledge(global.__luminaDb);
@@ -768,6 +775,7 @@ export function getDb() {
     migrateTagTaxonomy(global.__luminaDb);
     ensureCanonicalLibraryTags(global.__luminaDb);
     migrateDiscovery(global.__luminaDb);
+    } catch (error) { migrationsChecked = false; throw error; }
     return global.__luminaDb;
   }
   fs.mkdirSync(dataDirectory, { recursive: true });
@@ -775,9 +783,11 @@ export function getDb() {
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
-  migrate(db);
   global.__luminaDb = db;
-  return db;
+  migrate(db);
+  // Base recién abierta (al arrancar o tras bajar una copia de iCloud): se revisan sus migraciones.
+  migrationsChecked = false;
+  return getDb();
 }
 
 export function refreshVideoSearch(videoId: string) {

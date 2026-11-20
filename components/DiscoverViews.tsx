@@ -1,5 +1,6 @@
 "use client";
 
+import { SpaceDocumentModal, TimelineModal } from "./SpaceTools";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Headphones,
   ArrowDown,
@@ -13,7 +14,9 @@ import { Headphones,
   Circle,
   Copy,
   ExternalLink,
+  CalendarRange,
   FileText,
+  Github,
   Globe,
   MessageSquareQuote,
   MessagesSquare,
@@ -77,6 +80,7 @@ import dynamic from "next/dynamic";
 const GraphWorkspace = dynamic(() => import("./ConnectedWorkspaces").then((module) => module.GraphWorkspace), { ssr: false });
 import { formatTimestamp, isAudioFileUrl } from "@/lib/utils";
 import { libraryQueryTerms, spaceQueryMatches } from "@/lib/library-query";
+import { playSound } from "@/lib/sounds";
 
 async function readJson<T = { ok: boolean }>(url: string, init?: RequestInit) {
   const response = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...init?.headers } });
@@ -247,6 +251,7 @@ function movieOf(video: AppVideo) {
 }
 
 async function toggleWatched(video: AppVideo) {
+  if (!video.consumedAt) playSound("done");
   await readJson(`/api/videos/${video.id}`, { method: "PATCH", body: JSON.stringify({ action: video.consumedAt ? "unconsume" : "consume" }) });
 }
 
@@ -453,7 +458,7 @@ function SourceBody({ video, transcript, minutesOpen = false, onCoverChanged }: 
         </div>)}
         {!video.summary && <p className="lv-empty-copy">{video.status === "ready" ? "Aún no tiene resumen; abajo está la transcripción." : "Escuchando y transcribiendo el audio…"}</p>}
         {transcript.length > 0 && <details className="lv-transcript-fold" open={!video.summary}>
-          <summary>Transcripción completa</summary>
+          <summary>Transcripción completa<button type="button" className="lv-transcript-download" title="Descargar la transcripción (.txt)" aria-label="Descargar la transcripción" onClick={(event) => { event.preventDefault(); event.stopPropagation(); downloadTranscript(video, transcript); }}><ArrowDown size={13} /></button></summary>
           <div className="lv-transcript">{transcript.map((chunk) => <p key={chunk.id}>{at(chunk.startSeconds)} {chunk.text}</p>)}</div>
         </details>}
       </section>
@@ -475,7 +480,7 @@ function SourceBody({ video, transcript, minutesOpen = false, onCoverChanged }: 
         </div>)}
         {!video.summary && <p className="lv-empty-copy">Aún no tiene resumen; abajo está la transcripción.</p>}
         {transcript.length > 0 && <details className="lv-transcript-fold" open={!video.summary}>
-          <summary>Transcripción completa</summary>
+          <summary>Transcripción completa<button type="button" className="lv-transcript-download" title="Descargar la transcripción (.txt)" aria-label="Descargar la transcripción" onClick={(event) => { event.preventDefault(); event.stopPropagation(); downloadTranscript(video, transcript); }}><ArrowDown size={13} /></button></summary>
           <div className="lv-transcript">{transcript.map((chunk) => <p key={chunk.id}><a href={`https://www.youtube.com/watch?v=${video.youtubeId}&t=${Math.floor(chunk.startSeconds)}s`} target="_blank" rel="noreferrer">{formatTimestamp(chunk.startSeconds)}</a><span><Marked text={chunk.text} highlights={highlights} /></span></p>)}</div>
         </details>}
       </section>}
@@ -547,8 +552,8 @@ function SourceBody({ video, transcript, minutesOpen = false, onCoverChanged }: 
   if ((articleLength < 1_200 || !looksLikeArticle) && !translated) {
     return <div className="lv-web-stage">
       <figure className="lv-browser-frame">
-        <div className="lv-browser-bar"><i /><i /><i /><span>{sourceHost(video)}</span></div>
-        {artwork ? <img src={artwork} alt="" referrerPolicy="no-referrer" /> : <div className="lv-browser-empty"><strong>{video.title}</strong>{video.description && <p>{video.description}</p>}</div>}
+        <div className="lv-browser-bar"><i /><i /><i /><span>{sourceHost(video)}</span><RegenerateCover video={video} onDone={onCoverChanged} /></div>
+        {artwork ? <img src={artwork} alt="" referrerPolicy="no-referrer" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : <div className="lv-browser-empty"><strong>{video.title}</strong>{video.description && <p>{video.description}</p>}</div>}
         <a className="lv-browser-open" href={video.url} target="_blank" rel="noreferrer"><ExternalLink size={13} /> Abrir {sourceHost(video)}</a>
       </figure>
       <SnapshotNote video={video} />
@@ -599,7 +604,7 @@ const THEME_ICONS: Record<string, typeof Play> = {
 function CatalogTagIcon({ tag, catalog }: { tag: { id: string; name: string; level: string }; catalog: LibraryTag[] }) {
   const parentName = tag.level === "primary" ? tag.name : catalog.find((item) => item.id === catalog.find((entry) => entry.id === tag.id)?.parentIds[0])?.name;
   const Icon = (parentName && THEME_ICONS[parentName]) || Tag;
-  return <Icon size={12} className="lv-tag-icon" aria-hidden />;
+  return <Icon size={10} className="lv-tag-icon" aria-hidden />;
 }
 
 // Primera capa: el tipo de cosa guardada. La pone Lúmina y no se puede quitar.
@@ -718,6 +723,16 @@ function ConnectionsOverlay({ tab, onTab, onClose, items, video, catalog, collec
 }
 
 // Preguntas que el lector fantasma sugiere al abrir el chat: las del quiz cuando hay resumen, y unas generales si no.
+// La transcripción completa como .txt, con los minutos, para guardarla o pegarla en otro sitio.
+function downloadTranscript(video: AppVideo, transcript: Array<{ startSeconds: number; text: string }>) {
+  const header = `${video.title}\n${video.channel ? `${video.channel}\n` : ""}${video.url && !video.url.startsWith("local://") ? `${video.url}\n` : ""}\n`;
+  const body = transcript.map((chunk) => `[${formatTimestamp(chunk.startSeconds)}] ${chunk.text.trim()}`).join("\n\n");
+  const url = URL.createObjectURL(new Blob([header + body + "\n"], { type: "text/plain;charset=utf-8" }));
+  const link = Object.assign(document.createElement("a"), { href: url, download: `${video.title.replace(/[\\/:*?"<>|]/g, "").slice(0, 90) || "transcripcion"} — transcripción.txt` });
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function ghostSuggestions(video: AppVideo) {
   const summary = video.summary;
   const kind = video.sourceType === "youtube" ? "este video" : video.sourceType === "audio" ? "este audio" : video.sourceType === "pdf" ? "este documento" : "este texto";
@@ -728,7 +743,7 @@ function ghostSuggestions(video: AppVideo) {
     ...(summary.chapters?.length ? [] : (summary.sections ?? []).slice(0, 4).map((section) => `¿Qué se dice sobre «${section.title}»?`)),
     "¿Qué conclusión conviene recordar?",
     "¿Qué idea puedo poner en práctica?",
-  ];
+  ].slice(0, 5);
 }
 
 function GhostSection({ entries, context, onClearContext, onAsk, onRetry, onDismiss, onSave, inputRef, chat = false, onOpenChat, onCloseChat, suggestions = [] }: {
@@ -783,7 +798,7 @@ function GhostSection({ entries, context, onClearContext, onAsk, onRetry, onDism
         </div>
       </div>)}
       {pendingSuggestions.length > 0 && <div className="lv-ghost-suggestions">
-        <small>{entries.length ? "Sigue con" : "Para empezar"}</small>
+        <small>{entries.length ? "Sigue con" : "Preguntas sugeridas"}</small>
         {pendingSuggestions.slice(0, entries.length ? 3 : 7).map((item) => <button key={item} onClick={() => send(item)}>{item}</button>)}
       </div>}
     </div>
@@ -814,7 +829,7 @@ function queryValue(value: string) {
 function ImageSummary({ video, busy, onRegenerate }: { video: AppVideo; busy: boolean; onRegenerate: () => void }) {
   const visual = video.visual;
   return <section className="lv-tldr open">
-    <div className="lv-tldr-head"><button type="button" aria-expanded><span><Sparkles size={13} /> Resumen</span></button><button className="lv-regenerate" disabled={busy} onClick={onRegenerate} title="Vuelve a analizar la imagen y rehace título, resumen y etiquetas"><RefreshCw size={12} /> {visual?.description ? "Regenerar" : "Analizar"}</button></div>
+    <div className="lv-tldr-head"><button type="button" aria-expanded><span><Sparkles size={13} /> Resumen</span></button><button className="lv-regenerate" disabled={busy} onClick={onRegenerate} title={visual?.description ? "Regenerar (vuelve a analizar la imagen)" : "Analizar la imagen"} aria-label={visual?.description ? "Regenerar" : "Analizar"}><RefreshCw size={12} /></button></div>
     {visual?.description ? <p>{visual.description}</p> : <p className="lv-provisional-copy">{busy ? "Analizando la imagen…" : visual?.error ? "No se pudo leer la imagen. Pulsa Analizar para intentarlo de nuevo." : "Aún sin resumen. Pulsa Analizar para que la IA la describa."}</p>}
   </section>;
 }
@@ -846,7 +861,8 @@ function canQuiz(video: AppVideo) {
   return video.sourceType === "web" && !productOf(video) && !movieOf(video);
 }
 
-function InsightPanel({ minutesOpen, onToggleMinutes, quizOpen, onToggleQuiz, relatedOpen, onToggleRelated, relatedCount, graphOpen, onToggleGraph, chatMode = false, onChatMode, video, catalog, collections, spaces, connections, onOpenLink, onNavigate, onNoteReplaced, onSearch, onVibe, ghost, onChanged, onOpenFull, onAsk, onJumpToHighlight, onRemoveHighlight, onHighlightNote }: {
+function InsightPanel({ minutesOpen, onToggleMinutes, quizOpen, onToggleQuiz, relatedOpen, onToggleRelated, relatedCount, graphOpen, onToggleGraph, chatMode = false, onChatMode, video, catalog, collections, spaces, connections, onOpenLink, onNavigate, onNoteReplaced, onSearch, onVibe, ghost, onChanged, onOpenFull, onAsk, onJumpToHighlight, onRemoveHighlight, onHighlightNote, onArchived }: {
+  onArchived?: () => void;
   video: AppVideo;
   catalog: LibraryTag[];
   collections?: LibraryCollection[];
@@ -930,6 +946,15 @@ function InsightPanel({ minutesOpen, onToggleMinutes, quizOpen, onToggleQuiz, re
     catch (cause) { setError(cause instanceof Error ? cause.message : "No se pudo completar la acción."); }
     finally { setBusy(false); }
   }
+  // Sugerencias de etiquetas a pedido (por si las puestas no convencen): se añaden con un clic.
+  const [tagSuggestions, setTagSuggestions] = useState<Array<{ id: string; name: string; level: string; color: string }> | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+  const suggestTags = async () => {
+    setSuggesting(true);
+    try { setTagSuggestions((await readJson<{ tags: Array<{ id: string; name: string; level: string; color: string }> }>(`/api/videos/${video.id}/tags`, { method: "POST" })).tags); }
+    catch { setTagSuggestions([]); }
+    finally { setSuggesting(false); }
+  };
   const setTags = (tagIds: string[]) => act(() => readJson(`/api/videos/${video.id}/tags`, { method: "PUT", body: JSON.stringify({ tagIds }) }));
   const saveNote = () => { if (note !== (video.note?.content || "")) void act(() => readJson(`/api/videos/${video.id}/note`, { method: "PUT", body: JSON.stringify({ content: note }) })); };
   const patch = (action: string) => act(() => readJson(`/api/videos/${video.id}`, { method: "PATCH", body: JSON.stringify({ action }) }));
@@ -947,41 +972,41 @@ function InsightPanel({ minutesOpen, onToggleMinutes, quizOpen, onToggleQuiz, re
   const footer = <footer className="lv-actions"><div className="lv-actions-inner">
       {collectionsOpen && collections && <div className="lv-collection-picker" role="menu">
         {spaces && <>
-          <strong>Carpetas</strong>
-          {!spaces.length && <small>Aún no tienes carpetas.</small>}
+          <strong>Espacios</strong>
+          {!spaces.length && <small>Aún no tienes espacios.</small>}
           {spaces.map((space) => {
             const byQuery = spaceQueryMatches(space.query, video, catalog);
             const added = space.itemIds.includes(video.id);
             return <button key={space.id} role="menuitemcheckbox" aria-checked={byQuery || added} disabled={busy || byQuery} title={byQuery ? `Está aquí porque cumple la regla: ${space.query}` : undefined} onClick={() => void act(() => readJson(`/api/spaces/${space.id}/items/${video.id}`, { method: added ? "DELETE" : "PUT" }))}><i style={{ borderColor: space.color, background: byQuery || added ? space.color : "transparent" }} />{space.name}{byQuery ? <small>por regla ✦</small> : added && <Check size={13} />}</button>;
           })}
           <form className="lv-new-space" onSubmit={(event) => { event.preventDefault(); const name = newSpace.trim(); if (!name) return; setNewSpace(""); void act(() => readJson("/api/spaces", { method: "POST", body: JSON.stringify({ name, videoId: video.id }) })); }}>
-            <Plus size={13} /><input value={newSpace} maxLength={60} onChange={(event) => setNewSpace(event.target.value)} placeholder="Nueva carpeta…" aria-label="Nombre de la nueva carpeta" />
+            <Plus size={13} /><input value={newSpace} maxLength={60} onChange={(event) => setNewSpace(event.target.value)} placeholder="Nuevo espacio…" aria-label="Nombre de la nuevo espacio" />
           </form>
         </>}
       </div>}
-      <div className="lv-bubbles">{!isNote && !isImage && !isPalette && <button className={`lv-consume-bubble ${video.consumedAt ? "on" : ""}`} disabled={busy} aria-pressed={Boolean(video.consumedAt)} onClick={() => void patch(video.consumedAt ? "unconsume" : "consume")} title={video.consumedAt ? `${consume.done} · pulsa para desmarcar` : consume.pending} aria-label={video.consumedAt ? consume.done : consume.pending}><Check size={16} /></button>}
+      <div className="lv-bubbles">{!isNote && !isImage && !isPalette && <button className={`lv-consume-bubble ${video.consumedAt ? "on" : ""}`} disabled={busy} aria-pressed={Boolean(video.consumedAt)} onClick={() => { if (!video.consumedAt) playSound("done"); void patch(video.consumedAt ? "unconsume" : "consume"); }} title={video.consumedAt ? `${consume.done} · pulsa para desmarcar` : consume.pending} aria-label={video.consumedAt ? consume.done : consume.pending}><Check size={16} /></button>}
       {onToggleMinutes && (video.sourceType === "youtube" || video.sourceType === "audio") && <button className={minutesOpen ? "on" : ""} aria-pressed={minutesOpen} onClick={onToggleMinutes} title="Resumen minuto a minuto" aria-label="Resumen minuto a minuto"><ListOrdered size={16} /></button>}
-      {onToggleQuiz && canQuiz(video) && <button className={quizOpen ? "on" : ""} aria-pressed={quizOpen} onClick={onToggleQuiz} title="Quiz: preguntas para repasar con el chatbot" aria-label="Quiz"><ListChecks size={16} /></button>}
+      
       {onToggleRelated && <button className={relatedOpen ? "on" : ""} aria-pressed={relatedOpen} onClick={onToggleRelated} title={`Conexiones y grafo${relatedCount ? ` · ${relatedCount}` : ""}`} aria-label="Conexiones y grafo"><Link2 size={16} /></button>}
       {isImage && <a href={video.thumbnailUrl} download title="Descargar" aria-label="Descargar imagen"><ArrowDown size={16} /></a>}
       {isPdf && <a href={`/api/media/${video.id}.pdf`} download={`${video.title.slice(0, 80)}.pdf`} title="Descargar PDF" aria-label="Descargar PDF"><ArrowDown size={16} /></a>}
-      {collections && <button className={video.collections.length || inSomeSpace ? "on" : ""} onClick={() => setCollectionsOpen((current) => !current)} title="Carpetas" aria-label="Carpetas" aria-expanded={collectionsOpen}><Circle size={16} /></button>}
-      <button className={video.topPosition !== null && video.topPosition !== undefined ? "on" : ""} disabled={busy} aria-pressed={video.topPosition !== null && video.topPosition !== undefined} onClick={() => void patch(video.topPosition !== null && video.topPosition !== undefined ? "unpin" : "pin")} title={video.topPosition !== null && video.topPosition !== undefined ? "Quitar de En mente" : "Poner en En mente"} aria-label={video.topPosition !== null && video.topPosition !== undefined ? "Quitar de En mente" : "Poner en En mente"}><Pin size={16} /></button>
+      {collections && <button className={video.collections.length || inSomeSpace ? "on" : ""} onClick={() => setCollectionsOpen((current) => !current)} title="Espacios" aria-label="Espacios" aria-expanded={collectionsOpen}><Circle size={16} /></button>}
+      <button className={video.topPosition !== null && video.topPosition !== undefined ? "on" : ""} disabled={busy} aria-pressed={video.topPosition !== null && video.topPosition !== undefined} onClick={() => { if (video.topPosition === null || video.topPosition === undefined) playSound("pin"); void patch(video.topPosition !== null && video.topPosition !== undefined ? "unpin" : "pin"); }} title={video.topPosition !== null && video.topPosition !== undefined ? "Quitar de En mente" : "Poner en En mente"} aria-label={video.topPosition !== null && video.topPosition !== undefined ? "Quitar de En mente" : "Poner en En mente"}><Pin size={16} /></button>
       {!isLocal && <button onClick={() => void copyLink()} title={copied ? "Enlace copiado" : "Copiar enlace"} aria-label="Copiar enlace">{copied ? <Check size={16} /> : <Copy size={16} />}</button>}
       {!isLocal && <a href={video.url} target="_blank" rel="noreferrer" title="Abrir original" aria-label="Abrir original"><ExternalLink size={16} /></a>}
       {video.archivedAt
         ? <button disabled={busy} onClick={() => void patch("unarchive")} title="Restaurar" aria-label="Restaurar"><RotateCcw size={16} /></button>
-        : <button disabled={busy} onClick={() => void patch("archive")} title="Archivar (se puede restaurar)" aria-label="Archivar"><Trash2 size={16} /></button>}
+        : <button disabled={busy} onClick={() => { playSound("remove"); void patch("archive").then(() => onArchived?.()); }} title="Archivar (se puede restaurar)" aria-label="Archivar"><Trash2 size={16} /></button>}
   </div></div></footer>;
   if (chatMode && !isPalette && !isImage) return <aside className="lv-insight chat"><GhostSection {...ghostProps} />{footer}</aside>;
   return <aside className="lv-insight">
     <header>
       <strong>{video.title}</strong>
-      <small>{savedAgo(video.createdAt)}{!video.url.startsWith("local://") && <> · <a href={video.url} target="_blank" rel="noreferrer">{sourceHost(video)}</a></>}</small>
+      <small>{savedAgo(video.createdAt)}{!video.url.startsWith("local://") && <> · <a href={video.url} target="_blank" rel="noreferrer">{sourceHost(video)}</a></>}{!isNote && !isPalette && <> · <button className="lv-retitle" disabled={busy} onClick={() => void patch("retitle")} title="Otro título (la IA escribe uno nuevo)" aria-label="Otro título"><RefreshCw size={12} /></button></>}</small>
     </header>
     {isImage ? <ImageSummary video={video} busy={busy} onRegenerate={() => void patch("retry")} /> : isNote || isPalette ? null : summary ? <section className={`lv-tldr ${expanded ? "open" : ""}`}>
-      <div className="lv-tldr-head"><button onClick={() => setExpanded((current) => !current)} aria-expanded={expanded}><span><Sparkles size={13} /> Resumen</span><ChevronDown size={14} /></button><button className="lv-regenerate" disabled={busy} onClick={() => void patch("retry")} title="Vuelve a leer la fuente y rehace el resumen y las etiquetas"><RefreshCw size={12} /> Regenerar</button></div>
-      {isProvisionalSummary(summary.takeaways) && <small className="lv-provisional">Resumen provisional: la IA no respondió al guardarlo. Pulsa Regenerar.</small>}
+      <div className="lv-tldr-head"><button onClick={() => setExpanded((current) => !current)} aria-expanded={expanded}><span><Sparkles size={13} /> Resumen</span><ChevronDown size={14} /></button><button className="lv-regenerate" disabled={busy} onClick={() => void patch("retry")} title="Regenerar el resumen y las etiquetas" aria-label="Regenerar"><RefreshCw size={12} /></button></div>
+      {isProvisionalSummary(summary.takeaways) && <small className="lv-provisional">Resumen provisional: la IA no respondió al guardarlo. Pulsa ↻ para regenerarlo.</small>}
       <p onClick={() => setExpanded((current) => !current)} title={expanded ? "Ver menos" : "Ver más"}>{(summary.cardSummary || "").length > summary.gist.length ? summary.cardSummary : summary.gist}</p>
       {expanded && <>
         {summary.keyPoints.length > 0 && <ul>{summary.keyPoints.map((point, index) => <li key={index}>{point.text}</li>)}</ul>}
@@ -997,7 +1022,8 @@ function InsightPanel({ minutesOpen, onToggleMinutes, quizOpen, onToggleQuiz, re
       <ul className="lv-highlights">{highlights.map((highlight) => <HighlightItem key={highlight.id} highlight={highlight} onJump={() => onJumpToHighlight(highlight.id)} onRemove={() => onRemoveHighlight(highlight.id)} onNote={(value) => onHighlightNote(highlight.id, value)} />)}</ul>
     </section>}
     <section>
-      <h3>Etiquetas</h3>
+      <h3 className="lv-tags-head">Etiquetas <button className="lv-retitle" disabled={suggesting || busy} onClick={() => void suggestTags()} title="Sugerir etiquetas (la IA vuelve a leer la fuente)" aria-label="Sugerir etiquetas"><RefreshCw size={12} className={suggesting ? "spin" : ""} /></button></h3>
+      {tagSuggestions && <div className="lv-tag-suggestions">{tagSuggestions.length ? tagSuggestions.filter((tag) => !video.tags.some((item) => item.id === tag.id)).map((tag) => <button key={tag.id} disabled={busy} onClick={() => void setTags([...video.tags.map((item) => item.id), tag.id])} title="Añadir esta etiqueta"><Plus size={11} /><i style={{ background: tag.color }} />{tag.name}</button>) : <small>No hay más etiquetas que sugerir: las que tiene ya encajan.</small>}</div>}
       <div className="lv-tags">
         <TypeChip video={video} onSearch={onSearch} />
         {video.tags.map((tag) => <span key={tag.id} className={`lv-tag ${tag.level}`}>{onSearch ? <button className="lv-tag-name" onClick={() => onSearch(`#${queryValue(tag.name)}`)} title={`Ver todo lo etiquetado ${tag.name}`}>{tag.level !== "free" && <CatalogTagIcon tag={tag} catalog={catalog} />}{tag.name}</button> : <>{tag.level !== "free" && <CatalogTagIcon tag={tag} catalog={catalog} />}{tag.name}</>}<button disabled={busy} onClick={() => void setTags(video.tags.filter((item) => item.id !== tag.id).map((item) => item.id))} aria-label={`Quitar ${tag.name}`}><X size={11} /></button></span>)}
@@ -1029,7 +1055,7 @@ function InsightPanel({ minutesOpen, onToggleMinutes, quizOpen, onToggleQuiz, re
 
 type SelectionToolbar = { text: string; highlightId?: string; x: number; y: number; below: boolean };
 
-export function SourceDetail({ videoId, onNavigate, catalog, collections, spaces, onSearch, onVibe, onChanged, onOpenFull, onAsk }: {
+export function SourceDetail({ videoId, onNavigate, catalog, collections, spaces, onSearch, onVibe, onChanged, onOpenFull, onAsk, onArchived }: {
   videoId: string;
   onNavigate?: (id: string) => void;
   catalog: LibraryTag[];
@@ -1040,6 +1066,7 @@ export function SourceDetail({ videoId, onNavigate, catalog, collections, spaces
   onChanged?: () => Promise<void>;
   onOpenFull?: (id: string) => void;
   onAsk?: (id: string) => void;
+  onArchived?: () => void;
 }) {
   const [editingQuote, setEditingQuote] = useState(false);
   const [minutesOpen, setMinutesOpen] = useState(false);
@@ -1139,7 +1166,7 @@ export function SourceDetail({ videoId, onNavigate, catalog, collections, spaces
       <button onClick={() => { const text = toolbar.text; dismissToolbar(); startGhost("define", text); }}><BookA size={14} /> Definir</button>
       <button onClick={() => { const text = toolbar.text; dismissToolbar(); startGhost("simplify", text); }}><WandSparkles size={14} /> Simplificar</button>
     </div>}
-    <InsightPanel chatMode={chatMode} onChatMode={(open) => { setChatMode(open); if (open) window.requestAnimationFrame(() => ghostInputRef.current?.focus()); }} relatedOpen={overlay === "related"} relatedCount={detail.related?.length ?? 0} onToggleRelated={() => { setOverlay((current) => current === "related" ? null : "related"); contentRef.current?.scrollTo({ top: 0 }); }} graphOpen={overlay === "graph"} onToggleGraph={() => { setOverlay((current) => current === "graph" ? null : "graph"); contentRef.current?.scrollTo({ top: 0 }); }} quizOpen={chatMode} onToggleQuiz={() => setChatMode((current) => !current)} minutesOpen={minutesOpen} onToggleMinutes={() => { setMinutesOpen((current) => !current); window.setTimeout(() => contentRef.current?.querySelector("#lv-minutes")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }} key={`${detail.video.id}-${detail.video.note?.updatedAt || ""}`} connections={detail.connections} onOpenLink={(title) => void openLink(title)} onNavigate={(id) => onNavigate?.(id)} onNoteReplaced={() => { void load().then(() => setNoteRevision((current) => current + 1)); void onChanged?.(); }} video={detail.video} catalog={catalog} collections={collections} spaces={spaces} onSearch={onSearch} onVibe={onVibe} onOpenFull={onOpenFull} onAsk={onAsk} onChanged={refresh} onJumpToHighlight={jumpToHighlight} onRemoveHighlight={removeHighlight} onHighlightNote={noteHighlight} ghost={{
+    <InsightPanel onArchived={onArchived} chatMode={chatMode} onChatMode={(open) => { setChatMode(open); if (open) window.requestAnimationFrame(() => ghostInputRef.current?.focus()); }} relatedOpen={overlay === "related"} relatedCount={detail.related?.length ?? 0} onToggleRelated={() => { setOverlay((current) => current === "related" ? null : "related"); contentRef.current?.scrollTo({ top: 0 }); }} graphOpen={overlay === "graph"} onToggleGraph={() => { setOverlay((current) => current === "graph" ? null : "graph"); contentRef.current?.scrollTo({ top: 0 }); }} quizOpen={chatMode} onToggleQuiz={() => setChatMode((current) => !current)} minutesOpen={minutesOpen} onToggleMinutes={() => { setMinutesOpen((current) => !current); window.setTimeout(() => contentRef.current?.querySelector("#lv-minutes")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }} key={`${detail.video.id}-${detail.video.note?.updatedAt || ""}`} connections={detail.connections} onOpenLink={(title) => void openLink(title)} onNavigate={(id) => onNavigate?.(id)} onNoteReplaced={() => { void load().then(() => setNoteRevision((current) => current + 1)); void onChanged?.(); }} video={detail.video} catalog={catalog} collections={collections} spaces={spaces} onSearch={onSearch} onVibe={onVibe} onOpenFull={onOpenFull} onAsk={onAsk} onChanged={refresh} onJumpToHighlight={jumpToHighlight} onRemoveHighlight={removeHighlight} onHighlightNote={noteHighlight} ghost={{
       entries: ghostEntries,
       context: ghostContext,
       inputRef: ghostInputRef,
@@ -1191,7 +1218,7 @@ export function DetailModal({ videoId: initialVideoId, sequence = [], catalog, c
     <button className="lv-modal-esc" onClick={onClose}><ArrowDown size={13} /> ESC para cerrar</button>
     <div className="lv-modal-card">
       <button className="lv-modal-close" onClick={onClose} aria-label="Cerrar"><X size={17} /></button>
-      <SourceDetail key={videoId} videoId={videoId} onNavigate={setVideoId} catalog={catalog} collections={collections} spaces={spaces} onSearch={onSearch} onVibe={onVibe} onChanged={onChanged} onOpenFull={onOpenFull} onAsk={onAsk} />
+      <SourceDetail key={videoId} videoId={videoId} onNavigate={setVideoId} catalog={catalog} collections={collections} spaces={spaces} onSearch={onSearch} onVibe={onVibe} onChanged={onChanged} onOpenFull={onOpenFull} onAsk={onAsk} onArchived={onClose} />
     </div>
   </div>;
 }
@@ -1365,7 +1392,7 @@ function BoardSave({ video, saver }: { video: AppVideo; saver: BoardSaver }) {
   return <span className="lv-board-save" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
     <button type="button" className="lv-board-pick" aria-haspopup="listbox" aria-expanded={open} onClick={(event) => { event.stopPropagation(); setOpen((current) => !current); }}>{board.name}<ChevronDown size={12} /></button>
     <button type="button" className={`lv-board-go ${inBoard || state === "done" ? "done" : ""}`} disabled={state === "saving"} onClick={(event) => void save(event)}>{inBoard || state === "done" ? <><Check size={13} /> Guardado</> : state === "saving" ? "…" : "Guardar"}</button>
-    {open && <span className="lv-board-list" role="listbox" aria-label="Elegir carpeta">{saver.boards.map((item) => <button type="button" role="option" aria-selected={item.id === board.id} key={item.id} onClick={(event) => { event.stopPropagation(); saver.onPickBoard(item.id); setOpen(false); setState("idle"); }}><i style={{ background: item.color }} />{item.name}{video.collections.some((entry) => entry.id === item.id) && <Check size={12} />}</button>)}</span>}
+    {open && <span className="lv-board-list" role="listbox" aria-label="Elegir espacio">{saver.boards.map((item) => <button type="button" role="option" aria-selected={item.id === board.id} key={item.id} onClick={(event) => { event.stopPropagation(); saver.onPickBoard(item.id); setOpen(false); setState("idle"); }}><i style={{ background: item.color }} />{item.name}{video.collections.some((entry) => entry.id === item.id) && <Check size={12} />}</button>)}</span>}
   </span>;
 }
 
@@ -1381,9 +1408,12 @@ export function MosaicCard({ video, onOpen, selected = false, selecting = false,
   onVibe?: (video: AppVideo) => void;
 }) {
   const [artFailed, setArtFailed] = useState(false);
+  const [useOriginal, setUseOriginal] = useState(false);
   const [slide, setSlide] = useState(0);
   const gallery = galleryOf(video);
   const artwork = artFailed ? "" : gallery.length ? gallery[slide % gallery.length] : sourceArtwork(video);
+  // Miniatura WebP guardada en el Mac (rápida y a salvo de enlaces rotos); si falla, la imagen original.
+  const tileImage = !gallery.length && artwork && artwork === video.thumbnailUrl && !useOriginal ? `/api/thumb/${video.id}?w=640&v=${encodeURIComponent(artwork.slice(-24))}` : artwork;
   const text = sourceText(video);
   const isQuote = !artwork && (video.sourceType === "x" || video.sourceType === "reddit") && Boolean(text);
   const accent = sourceAccent(video);
@@ -1405,7 +1435,7 @@ export function MosaicCard({ video, onOpen, selected = false, selecting = false,
     {(selecting || selected) && <i className="lv-tile-check" aria-hidden>{selected && <Check size={13} />}</i>}
     {video.sourceType === "note" && quoteFromNote(video.note?.content || "") ? <span className="lv-tile-quote-card"><b aria-hidden>“</b>{(() => { const quote = quoteFromNote(video.note?.content || "")!; return <>{quote.text.length > 280 ? `${quote.text.slice(0, 277)}…` : quote.text}<b aria-hidden>”</b>{quote.author && <small>{quote.author}</small>}</>; })()}</span>
       : video.sourceType === "palette" ? <span className="lv-tile-palette">{(video.visual?.colors ?? []).map((swatch) => <i key={swatch.hex} style={{ background: swatch.hex, flexGrow: Math.max(swatch.share, 0.08) }}><b>{swatch.hex.toUpperCase()}</b></i>)}</span>
-      : artwork ? <span className="lv-tile-art"><img src={artwork} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setArtFailed(true)} />{video.sourceType === "youtube" && <i><Play size={14} fill="currentColor" /></i>}
+      : artwork ? <span className="lv-tile-art"><img src={tileImage} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => { if (tileImage !== artwork) setUseOriginal(true); else setArtFailed(true); }} /><TileKind video={video} />
       {gallery.length > 0 && <>
         <span className="lv-tile-count">{slide + 1}/{gallery.length}</span>
         <span className="lv-tile-dots-row" aria-hidden>{gallery.map((_, index) => <i key={index} className={index === slide ? "on" : ""} />)}</span>
@@ -1414,14 +1444,39 @@ export function MosaicCard({ video, onOpen, selected = false, selecting = false,
       </>}
       {movieOf(video) && <button type="button" className={`lv-tile-watch ${video.consumedAt ? "on" : ""}`} onClick={(event) => { event.stopPropagation(); void toggleWatched(video).then(() => onCoverChanged?.()); }} title={video.consumedAt ? "Marcar como por ver" : "Marcar como vista"}>{video.consumedAt ? "✓ Vista" : "Por ver"}</button>}
       {productOf(video)?.price && <span className="lv-tile-price">{formatPrice(productOf(video)!.price, productOf(video)!.currency)}{productOf(video)!.brand ? ` · ${productOf(video)!.brand}` : ""}</span>}
+      {!selecting && video.title && <span className="lv-tile-hover-title" aria-hidden>{video.title}</span>}
       {!selecting && <span className="lv-tile-hover">
-        {saver && saver.boards.length > 0 && <BoardSave video={video} saver={saver} />}
-        {onVibe && video.visual?.hasPrint && <button type="button" className="lv-tile-more" onClick={(event) => { event.stopPropagation(); onVibe(video); }}><Palette size={13} /> Más como esto</button>}
+        {onMenu && <button type="button" className="lv-tile-corner-dots" aria-label={`Más acciones para ${video.title}`} onClick={(event) => { event.stopPropagation(); const box = event.currentTarget.getBoundingClientRect(); onMenu(box.right - 200, box.bottom + 4); }}><MoreHorizontal size={15} /></button>}
+        {onVibe && video.sourceType === "image" && video.visual?.hasPrint && <button type="button" className="lv-tile-more" title="Más como esto: imágenes que se ven parecidas" aria-label="Más como esto" onClick={(event) => { event.stopPropagation(); onVibe(video); }}><Palette size={14} /></button>}
       </span>}</span>
-      : isQuote ? <span className="lv-tile-quote">{accent.label && <b className="lv-tile-mark">{accent.label}</b>}{text.slice(0, 260)}{text.length > 260 ? "…" : ""}</span>
-        : <span className="lv-tile-title"><small>{accent.label && <b className="lv-tile-mark">{accent.label}</b>}{sourceHost(video)}</small><strong>{video.title}</strong><span>{sourcePreview(video).slice(0, 150)}</span>{!selecting && saver && saver.boards.length > 0 && <span className="lv-tile-hover inline"><BoardSave video={video} saver={saver} /></span>}</span>}
+      : isQuote ? <span className="lv-tile-quote">{accent.label && <b className={`lv-tile-mark ${video.summary?.headline ? "with-title" : ""}`}>{video.summary?.headline ? <span>{video.summary.headline}</span> : <em>{accent.label}</em>}</b>}<span className="lv-tile-quote-text">{text.slice(0, 420)}</span></span>
+        : <span className="lv-tile-title"><small>{accent.label && <b className="lv-tile-mark">{accent.label}</b>}{sourceHost(video)}</small><strong>{video.title}</strong><span>{sourcePreview(video).slice(0, 150)}</span></span>}
     <span className="lv-tile-caption"><span>{artwork || isQuote ? video.title : sourceHost(video)}</span>{onMenu && <button type="button" className="lv-tile-dots" aria-label={`Más acciones para ${video.title}`} onClick={(event) => { event.stopPropagation(); const box = event.currentTarget.getBoundingClientRect(); onMenu(box.left, box.bottom + 4); }}><MoreHorizontal size={15} /></button>}</span>
   </div>;
+}
+
+// Botón para tomar de nuevo la captura de una web (por si salió en blanco o la página cambió).
+function RegenerateCover({ video, onDone }: { video: AppVideo; onDone?: () => void | Promise<void> }) {
+  const [state, setState] = useState<"idle" | "busy" | "error">("idle");
+  const regenerate = async () => {
+    setState("busy");
+    try { await readJson(`/api/videos/${video.id}/cover`, { method: "PUT" }); playSound("done"); setState("idle"); await onDone?.(); }
+    catch { setState("error"); window.setTimeout(() => setState("idle"), 2500); }
+  };
+  return <button type="button" className={`lv-browser-regen ${state}`} disabled={state === "busy"} onClick={() => void regenerate()} title={state === "error" ? "No se pudo tomar una nueva captura" : "Regenerar portada"} aria-label="Regenerar portada">{state === "busy" ? <LoaderCircle className="spin" size={13} /> : <RefreshCw size={13} />}</button>;
+}
+
+// Icono pequeño que dice qué es cada tarjeta (video, web, imagen, PDF…).
+function TileKind({ video }: { video: AppVideo }) {
+  let host = "";
+  try { host = new URL(video.url).hostname; } catch { host = ""; }
+  const label = host.includes("github.com") ? "GitHub" : video.sourceType === "x" ? "Publicación de X" : video.sourceType === "reddit" ? "Reddit" : TYPE_CHIPS[video.sourceType]?.label || "Fuente";
+  const content = host.includes("github.com") ? <Github size={11} />
+    : video.sourceType === "x" ? <b>𝕏</b>
+    : video.sourceType === "reddit" ? <b>r/</b>
+    : video.sourceType === "youtube" ? <Play size={10} fill="currentColor" />
+    : (() => { const Icon = TYPE_CHIPS[video.sourceType]?.Icon || Globe; return <Icon size={11} />; })();
+  return <i className={`lv-tile-kind kind-${video.sourceType}`} title={label} aria-label={label}>{content}</i>;
 }
 
 async function copyImageToClipboard(url: string) {
@@ -1491,9 +1546,9 @@ function TileMenu({ menu, catalog, spaces, onClose, onChanged, onOpen, onVibe, o
       {onVibe && video.visual?.hasPrint && <button role="menuitem" onClick={() => { onClose(); onVibe(video); }}><Palette size={14} /> Misma vibra</button>}
       <hr />
       <button role="menuitem" onClick={() => setView("tags")}><Tag size={14} /> Etiquetas<ChevronRight size={13} /></button>
-      <button role="menuitem" onClick={() => setView("spaces")}><Folder size={14} /> Carpetas<ChevronRight size={13} /></button>
-      <button role="menuitem" onClick={() => void run(() => patch(pinned ? "unpin" : "pin"))}><Pin size={14} /> {pinned ? "Quitar de En mente" : "Poner en En mente"}</button>
-      <button role="menuitem" onClick={() => void run(() => patch(video.consumedAt ? "unconsume" : "consume"))}><Check size={14} /> {video.consumedAt ? "Marcar como pendiente" : labels.pending}</button>
+      <button role="menuitem" onClick={() => setView("spaces")}><Folder size={14} /> Espacios<ChevronRight size={13} /></button>
+      <button role="menuitem" onClick={() => { if (!pinned) playSound("pin"); void run(() => patch(pinned ? "unpin" : "pin")); }}><Pin size={14} /> {pinned ? "Quitar de En mente" : "Poner en En mente"}</button>
+      <button role="menuitem" onClick={() => { if (!video.consumedAt) playSound("done"); void run(() => patch(video.consumedAt ? "unconsume" : "consume")); }}><Check size={14} /> {video.consumedAt ? "Marcar como pendiente" : labels.pending}</button>
       <hr />
       {video.sourceType === "image" && (video.visual?.colors ?? []).length >= 2 && <button role="menuitem" onClick={() => void run(() => readJson(`/api/videos/${video.id}/palette`, { method: "POST" }), "Paleta guardada.")}><Palette size={14} /> Sacar paleta</button>}
       {video.sourceType === "image" && <button role="menuitem" onClick={() => copy(() => copyImageToClipboard(video.thumbnailUrl), "Imagen copiada.")}><Copy size={14} /> Copiar imagen</button>}
@@ -1501,7 +1556,7 @@ function TileMenu({ menu, catalog, spaces, onClose, onChanged, onOpen, onVibe, o
       {!isLocal && <button role="menuitem" onClick={() => copy(() => navigator.clipboard.writeText(video.url), "Enlace copiado.")}><Copy size={14} /> Copiar enlace</button>}
       {!isLocal && <a role="menuitem" href={video.url} target="_blank" rel="noreferrer" onClick={onClose}><ExternalLink size={14} /> Abrir original</a>}
       <hr />
-      <button role="menuitem" className="danger" onClick={() => void run(() => patch("archive"), "Archivada.", video.id)}><Trash2 size={14} /> Archivar</button>
+      <button role="menuitem" className="danger" onClick={() => { playSound("remove"); void run(() => patch("archive"), "Archivada.", video.id); }}><Trash2 size={14} /> Archivar</button>
     </>}
     {view === "tags" && <>
       <button className="lv-tile-menu-back" onClick={() => { setView("root"); setFilter(""); }}><ArrowLeft size={13} /> Etiquetas</button>
@@ -1512,14 +1567,14 @@ function TileMenu({ menu, catalog, spaces, onClose, onChanged, onOpen, onVibe, o
       })}</div>
     </>}
     {view === "spaces" && <>
-      <button className="lv-tile-menu-back" onClick={() => setView("root")}><ArrowLeft size={13} /> Carpetas</button>
+      <button className="lv-tile-menu-back" onClick={() => setView("root")}><ArrowLeft size={13} /> Espacios</button>
       <div className="lv-tile-menu-list">{spaces.map((space) => {
         const byQuery = spaceQueryMatches(space.query, video, catalog);
         const added = space.itemIds.includes(video.id);
         return <button key={space.id} role="menuitemcheckbox" aria-checked={byQuery || added} disabled={byQuery} title={byQuery ? `Está aquí porque cumple la regla: ${space.query}` : undefined} onClick={() => void run(() => readJson(`/api/spaces/${space.id}/items/${video.id}`, { method: added ? "DELETE" : "PUT" }))}><i className="ring" style={{ borderColor: space.color, background: byQuery || added ? space.color : "transparent" }} />{space.name}{byQuery ? <small>por regla ✦</small> : added && <Check size={13} />}</button>;
       })}</div>
       <form onSubmit={(event) => { event.preventDefault(); const name = newSpace.trim(); if (name) void run(() => readJson("/api/spaces", { method: "POST", body: JSON.stringify({ name, videoId: video.id }) }), `Añadida a ${name}.`); }}>
-        <input value={newSpace} maxLength={60} onChange={(event) => setNewSpace(event.target.value)} placeholder="Nueva carpeta…" aria-label="Nombre de la nueva carpeta" />
+        <input value={newSpace} maxLength={60} onChange={(event) => setNewSpace(event.target.value)} placeholder="Nuevo espacio…" aria-label="Nombre de la nuevo espacio" />
       </form>
     </>}
   </div>;
@@ -1577,14 +1632,14 @@ export function SaveSpaceModal({ query, onClose, onSaved }: { query: string; onC
     try {
       const { space } = await readJson<{ space: SmartSpace }>("/api/spaces", { method: "POST", body: JSON.stringify({ name, color, query: terms.join(" ") }) });
       onSaved(space);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "No se pudo crear la carpeta."); setStep("name"); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "No se pudo crear el espacio."); setStep("name"); }
     finally { setBusy(false); }
   }
   return <div className="lv-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
     <div className="lv-space-modal">
       {step === "name" ? <>
         <span className="lv-space-mark" aria-hidden><i /><i /><i /><i /></span>
-        <h2>Nueva carpeta</h2>
+        <h2>Nuevo espacio</h2>
         <p>Mete cosas a mano o, si le pones una regla, se llena sola con todo lo que coincida, ahora y en el futuro.</p>
         <div className="lv-space-terms">
           {terms.map((term) => <span key={term}>{term}<button onClick={() => setTerms((current) => current.filter((item) => item !== term))} aria-label={`Quitar ${term}`}><X size={11} /></button></span>)}
@@ -1593,12 +1648,12 @@ export function SaveSpaceModal({ query, onClose, onSaved }: { query: string; onC
             if (event.key === "Backspace" && !termDraft) setTerms((current) => current.slice(0, -1));
           }} placeholder={terms.length ? "Añadir otro término…" : "Regla opcional: #etiqueta, tipo:imagen, nubes…"} />
         </div>
-        <input className="lv-space-name" autoFocus={terms.length > 0} value={name} maxLength={60} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && name.trim()) next(); }} placeholder="Nombre de la carpeta" />
+        <input className="lv-space-name" autoFocus={terms.length > 0} value={name} maxLength={60} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && name.trim()) next(); }} placeholder="Nombre del espacio" />
         {error && <p className="lv-error">{error}</p>}
         <div className="lv-space-actions"><button onClick={onClose}>Cancelar</button><button className="primary" disabled={!name.trim()} onClick={next}>Siguiente paso</button></div>
       </> : <>
         <h2>Elige un color</h2>
-        <p>Te ayuda a reconocer la carpeta de un vistazo.</p>
+        <p>Te ayuda a reconocer el espacio de un vistazo.</p>
         <div className="lv-color-ring">{SPACE_COLORS.map((item, index) => {
           const angle = (index / SPACE_COLORS.length) * Math.PI * 2 - Math.PI / 2;
           return <button key={item} className={item === color ? "active" : ""} style={{ left: `calc(50% + ${Math.cos(angle) * 68}px)`, top: `calc(50% + ${Math.sin(angle) * 68}px)`, borderColor: item }} onClick={() => setColor(item)} aria-label={`Color ${index + 1}`} aria-pressed={item === color} />;
@@ -1614,7 +1669,9 @@ export function spaceVideos(space: SmartSpace, videos: AppVideo[], tags: Library
   return videos.filter((video) => manual.has(video.id) || spaceQueryMatches(space.query, video, tags));
 }
 
-export function SpacesWorkspace({ spaces, videos, tags, onOpenSpace, onChanged }: {
+export function SpacesWorkspace({ spaces, videos, tags, onOpenSpace, onChanged, onChat, onOpenSource }: {
+  onChat?: (space: SmartSpace) => void;
+  onOpenSource?: (id: string) => void;
   spaces: SmartSpace[];
   videos: AppVideo[];
   tags: LibraryTag[];
@@ -1623,6 +1680,8 @@ export function SpacesWorkspace({ spaces, videos, tags, onOpenSpace, onChanged }
 }) {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+  const [docSpace, setDocSpace] = useState<SmartSpace | null>(null);
+  const [timelineSpace, setTimelineSpace] = useState<SmartSpace | null>(null);
   const byId = new Map(spaces.map((space) => [space.id, space]));
   const { order, dragId, dragProps } = useDragOrder(spaces.map((space) => space.id), async (ids) => {
     setError("");
@@ -1630,19 +1689,26 @@ export function SpacesWorkspace({ spaces, videos, tags, onOpenSpace, onChanged }
     catch (cause) { setError(cause instanceof Error ? cause.message : "No se pudo reordenar."); }
   });
   return <main className="lv-spaces">
-    <header><div><h1>Carpetas</h1><p>Lo que metes a mano y, si tienen regla ✦, todo lo que coincide. Arrástralas para ordenarlas.</p></div><button className="primary-button" onClick={() => setCreating(true)}><Plus size={16} /> Nueva carpeta</button></header>
-    {spaces.length ? <div className="lv-space-grid">{order.map((id) => {
+    <header><div><h1>Espacios inteligentes</h1><p>Lo que metes a mano y, si tienen regla ✦, todo lo que coincide. Arrástralos para ordenarlos.</p></div><button className="primary-button" onClick={() => setCreating(true)}><Plus size={16} /> Nuevo espacio</button></header>
+    {spaces.length ? <div className="lv-boards lv-space-boards">{order.map((id) => {
       const space = byId.get(id)!;
       const matches = spaceVideos(space, videos, tags);
-      return <article key={id} className={`lv-space-card ${dragId === id ? "dragging" : ""}`} {...dragProps(id)} {...pressable(() => onOpenSpace(id))}>
-        <span className="lv-stack">{matches.slice(0, 3).reverse().map((video, index, list) => {
-          const artwork = sourceArtwork(video);
-          return <span key={video.id} className={`layer-${list.length - 1 - index}`}>{artwork ? <img src={artwork} alt="" draggable={false} loading="lazy" referrerPolicy="no-referrer" /> : <small>{video.title}</small>}</span>;
-        })}{!matches.length && <span className="layer-0 empty"><Layers size={20} /></span>}</span>
-        <span className="lv-space-label"><i style={{ borderColor: space.color }} />{space.name}{space.query && <em className="lv-rule-mark" title={`Regla: ${space.query}`}>✦</em>}<small>{matches.length}</small></span>
+      // Como tablero: portada de tres imágenes, nombre y cuántas cosas tiene; arriba, un atajo para chatear con el espacio.
+      const art = matches.map((video) => sourceArtwork(video)).filter(Boolean).slice(0, 3);
+      return <article key={id} className={`lv-board lv-space-board ${dragId === id ? "dragging" : ""}`} {...dragProps(id)} {...pressable(() => onOpenSpace(id))}>
+        <span className="lv-board-cover">{[0, 1, 2].map((index) => <span key={index}>{art[index] && <img src={art[index]} alt="" draggable={false} loading="lazy" referrerPolicy="no-referrer" />}</span>)}</span>
+        {matches.length > 0 && <span className="lv-space-actions">
+          {onChat && <button type="button" className="lv-space-chat" title={`Chatear con «${space.name}»`} aria-label={`Chatear con ${space.name}`} onClick={(event) => { event.stopPropagation(); onChat(space); }}><MessageCircle size={15} /></button>}
+          <button type="button" className="lv-space-chat" title="Crear un documento con citas" aria-label={`Crear documento de ${space.name}`} onClick={(event) => { event.stopPropagation(); setDocSpace(space); }}><FileText size={15} /></button>
+          <button type="button" className="lv-space-chat" title="Línea de tiempo" aria-label={`Línea de tiempo de ${space.name}`} onClick={(event) => { event.stopPropagation(); setTimelineSpace(space); }}><CalendarRange size={15} /></button>
+        </span>}
+        <strong><i style={{ borderColor: space.color }} />{space.name}{space.query && <em className="lv-rule-mark" title={`Regla: ${space.query}`}>✦</em>}</strong>
+        <small>{matches.length} {matches.length === 1 ? "elemento" : "elementos"}</small>
       </article>;
-    })}</div> : <div className="lv-empty-state"><Layers size={26} /><strong>Aún no tienes carpetas</strong><p>Crea una y mete cosas a mano, o busca algo como <code>#Inteligencia tipo:x</code> y guárdalo como carpeta inteligente.</p></div>}
+    })}</div> : <div className="lv-empty-state"><Layers size={26} /><strong>Aún no tienes espacios</strong><p>Crea una y mete cosas a mano, o busca algo como <code>#Inteligencia tipo:x</code> y guárdalo como espacio inteligente.</p></div>}
     {error && <p className="lv-error">{error}</p>}
+    {docSpace && <SpaceDocumentModal spaceId={docSpace.id} spaceName={docSpace.name} onClose={() => setDocSpace(null)} onSaved={() => void onChanged()} />}
+    {timelineSpace && <TimelineModal title={timelineSpace.name} videos={spaceVideos(timelineSpace, videos, tags)} onClose={() => setTimelineSpace(null)} onOpen={(id) => { setTimelineSpace(null); onOpenSource?.(id); }} />}
     {creating && <SaveSpaceModal query="" onClose={() => setCreating(false)} onSaved={(space) => { setCreating(false); void onChanged().then(() => onOpenSpace(space.id)); }} />}
   </main>;
 }
@@ -1780,7 +1846,7 @@ export function SerendipityWorkspace({ videos, catalog, collections, spaces, onS
   async function addToSpace(space: SmartSpace) {
     if (!current) return;
     try { await readJson(`/api/spaces/${space.id}/items/${current.id}`, { method: "PUT" }); setQuick(""); say(`Añadida a ${space.name}.`); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "No se pudo añadir a la carpeta."); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "No se pudo añadir al espacio."); }
   }
 
   if (!deck.length) return <main className="lv-serendipity end"><div className="lv-closing"><blockquote>Aún no hay suficientes fuentes para redescubrir.</blockquote><button onClick={onExit}>Volver a mi biblioteca</button></div></main>;
@@ -1805,7 +1871,7 @@ export function SerendipityWorkspace({ videos, catalog, collections, spaces, onS
       </div>
       <div className="lv-serendipity-quick">
         <button className={quick === "note" ? "on" : ""} onClick={() => setQuick(quick === "note" ? "" : "note")}><StickyNote size={13} /> Nota</button>
-        {(spaces ?? []).length > 0 && <button className={quick === "space" ? "on" : ""} onClick={() => setQuick(quick === "space" ? "" : "space")}><Folder size={13} /> Carpeta</button>}
+        {(spaces ?? []).length > 0 && <button className={quick === "space" ? "on" : ""} onClick={() => setQuick(quick === "space" ? "" : "space")}><Folder size={13} /> Espacio</button>}
       </div>
       {quick === "note" && <form className="lv-serendipity-note" onSubmit={(event) => { event.preventDefault(); void saveQuickNote(); }}><textarea autoFocus rows={2} value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void saveQuickNote(); if (event.key === "Escape") setQuick(""); }} placeholder={noteDictation.state === "recording" ? "Escuchando… pulsa para terminar" : noteDictation.state === "working" ? "Pasando tu voz a texto…" : "¿Por qué vale la pena conservarlo?"} /><button type="button" className={`lv-note-mic ${noteDictation.state}`} onClick={noteDictation.toggle} disabled={noteDictation.state === "working"} aria-label={noteDictation.state === "recording" ? "Terminar de dictar" : "Dictar la nota"} title="Dictar">{noteDictation.state === "working" ? <LoaderCircle className="spin" size={14} /> : noteDictation.state === "recording" ? <Square size={12} /> : <Mic size={15} />}</button>{noteDictation.error && <p className="lv-error">{noteDictation.error}</p>}<button type="submit">Guardar</button></form>}
       {quick === "space" && <div className="lv-serendipity-spaces">{(spaces ?? []).map((space) => <button key={space.id} onClick={() => void addToSpace(space)}><i style={{ borderColor: space.color }} />{space.name}</button>)}</div>}

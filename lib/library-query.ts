@@ -161,13 +161,24 @@ function sourceMatches(video: AppVideo, requested: string) {
   return normalize(video.sourceType).includes(type);
 }
 
+// El texto buscable de cada fuente se prepara una sola vez (no en cada tecla ni para cada filtro).
+// Se guarda por objeto: cuando la fuente cambia, llega un objeto nuevo y se vuelve a preparar.
+const searchableCache = new WeakMap<AppVideo, string>();
+function searchableText(video: AppVideo) {
+  const cached = searchableCache.get(video);
+  if (cached !== undefined) return cached;
+  const text = normalize([video.title, video.channel, video.description, video.summary?.gist, video.note?.content, video.tags.map((tag) => tag.name).join(" "), video.collections.map((item) => item.name).join(" "), video.sourceItems.map((item) => item.text).join(" "), video.highlights?.flatMap((item) => [item.quote, item.note]).join(" "), video.visual?.text, video.visual?.description, video.visual?.objects.join(" "), video.visual?.labels.flatMap((label) => [label.name, label.id]).join(" ")].filter(Boolean).join(" "));
+  searchableCache.set(video, text);
+  return text;
+}
+
 export function matchesLibraryQuery(video: AppVideo, parsed: ParsedLibraryQuery, catalog: LibraryTag[] = []): boolean {
   if (parsed.dateRange) {
     const saved = new Date(video.createdAt).getTime();
     if (saved < parsed.dateRange.from || saved >= parsed.dateRange.to) return false;
   }
   if (!parsed.anyOf.every((alternatives) => alternatives.some((alternative) => matchesLibraryQuery(video, alternative, catalog)))) return false;
-  const searchable = normalize([video.title, video.channel, video.description, video.summary?.gist, video.note?.content, video.tags.map((tag) => tag.name).join(" "), video.collections.map((item) => item.name).join(" "), video.sourceItems.map((item) => item.text).join(" "), video.highlights?.flatMap((item) => [item.quote, item.note]).join(" "), video.visual?.text, video.visual?.description, video.visual?.objects.join(" "), video.visual?.labels.flatMap((label) => [label.name, label.id]).join(" ")].filter(Boolean).join(" "));
+  const searchable = searchableText(video);
   if (parsed.text && !normalize(parsed.text).split(/\s+/).every((term) => includesTerm(searchable, term))) return false;
   if (parsed.site) {
     try { if (!normalize(new URL(video.url).hostname).includes(normalize(parsed.site))) return false; } catch { return false; }

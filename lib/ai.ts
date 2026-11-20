@@ -252,8 +252,9 @@ async function summarizeVideoWithProvider(title: string, channel: string, descri
   const schema = {
     type: "object",
     additionalProperties: false,
-    required: ["gist", "cardSummary", "sourceTranslation", "sections", "keyPoints", "chapters", "takeaways", "tags", "topics", "entities", "relations"],
+    required: ["headline", "gist", "cardSummary", "sourceTranslation", "sections", "keyPoints", "chapters", "takeaways", "tags", "topics", "entities", "relations"],
     properties: {
+      headline: { type: "string" },
       gist: { type: "string" },
       cardSummary: { type: "string" },
       sourceTranslation: { type: "string" },
@@ -316,7 +317,7 @@ async function summarizeVideoWithProvider(title: string, channel: string, descri
   };
   const sourceLabel = sourceType === "x" ? "Publicación pública de X" : sourceType === "reddit" ? "Publicación e hilo público de Reddit" : sourceType === "web" ? "Artículo o página web pública" : "Video de YouTube";
   const prompt = `Tipo de fuente: ${sourceLabel}\nTítulo: ${title}\nAutor o canal: ${channel}\nDescripción: ${description.slice(0, 5000)}\n\nCONTENIDO:\n${transcript}\n\nCATÁLOGO CERRADO DE ETIQUETAS:\n${JSON.stringify(compactTagCatalog)}\n\nETIQUETAS LIBRES QUE YA EXISTEN (reutilízalas si encajan): ${JSON.stringify(existingFreeTagNames(150))}\n\nEn topics devuelve entre 3 y 8 etiquetas libres, cortas (1 a 3 palabras), concretas y en español salvo nombres propios: personas, lugares, marcas, herramientas, eventos o temas específicos que no estén ya en el catálogo. Usa mayúscula inicial solo en nombres propios. Si una existente encaja, escríbela exactamente igual.\n\nEn tags devuelve exclusivamente entre 1 y 3 IDs primary y entre 0 y 2 IDs secondary del catálogo (secondary solo si encaja con claridad). Etiqueta solo por el TEMA PRINCIPAL de la fuente, nunca por la plataforma ni el formato: que sea un tweet, un post de Reddit o un video no la convierte en «Redes sociales», «Comunicación» ni «Audiovisual»; una palabra mencionada de pasada (por ejemplo «estudié mercadeo») no justifica «Marketing». Pregúntate: ¿alguien que busque esta etiqueta esperaría encontrar esta fuente? Si dudas, no la pongas. Mejor una sola etiqueta certera que varias dudosas. Las etiquetas libres (topics) siguen la misma regla: nada de etiquetas por la plataforma.`;
-  const cardSummaryInstruction = "En cardSummary escribe un único párrafo en español de 26 a 34 palabras, concreto y fluido, pensado para ocupar aproximadamente tres líneas en una tarjeta. Explica la idea central y uno o dos aspectos útiles; no uses encabezados, listas, frases de relleno ni termines una idea a medias.";
+  const cardSummaryInstruction = "En headline escribe un título en español de 4 a 12 palabras (máximo 80 caracteres) que diga de qué trata la fuente, como un buen titular: quién hace qué o cuál es el tema (por ejemplo «Milei responde con un comentario absurdo sobre sirenas en una entrevista»). No copies la primera frase, no pongas el nombre de la cuenta como título, sin comillas ni punto final. En cardSummary escribe un único párrafo en español de 26 a 34 palabras, concreto y fluido, pensado para ocupar aproximadamente tres líneas en una tarjeta. Explica la idea central y uno o dos aspectos útiles; no uses encabezados, listas, frases de relleno ni termines una idea a medias.";
   const systemInstruction = sourceType !== "youtube"
     ? `Analiza esta ${sourceType === "reddit" ? "publicación y sus comentarios públicos de Reddit" : sourceType === "web" ? "página o artículo web, respetando sus secciones" : "publicación de X"} con rigor. Todos los campos de salida deben estar siempre en español natural, aunque la fuente esté en otro idioma. No la alargues artificialmente ni inventes contexto. En sourceTranslation devuelve una traducción fiel al español del contenido cuando el original esté en otro idioma; conserva párrafos y encabezados, y si ya está en español devuelve una cadena vacía. ${sourceType === "web" ? "En gist escribe una sola frase breve, concreta y funcional —entre 7 y 18 palabras— que diga para qué sirve esa web o herramienta." : "Resume su afirmación central, argumentos, datos y matices presentes."} ${cardSummaryInstruction} Crea entre 1 y 6 secciones temáticas, entre 1 y 8 ideas clave y entre 1 y 5 conclusiones. En tags usa solamente IDs del catálogo aportado. Usa startSeconds para indicar el ordinal de la ${sourceType === "web" ? "sección del artículo" : "publicación o comentario"} que sustenta cada evidencia.`
     : `Analiza videos con rigor y escribe en español natural. Devuelve sourceTranslation como cadena vacía. ${cardSummaryInstruction} Crea un resumen detallado de 3 a 8 secciones temáticas con títulos específicos. Cada sección debe contener entre 2 y 5 puntos completos con timestamps exactos. Cubre proporcionalmente todo el video y no inventes información ausente. Genera además entre 3 y 8 ideas clave, entre 2 y 12 capítulos y entre 2 y 6 conclusiones. En tags usa solamente IDs del catálogo aportado.`;
@@ -334,7 +335,7 @@ async function summarizeVideoWithProvider(title: string, channel: string, descri
       if (!isInvalidArgumentAIError(error)) throw error;
       response = await client.models.generateContent({
         model: GEMINI_TEXT_MODEL,
-        contents: `${prompt}\n\nDevuelve un objeto JSON con estas claves exactas: gist (string), cardSummary (string), sourceTranslation (string), sections ({title,points:{text,startSeconds}[]}[]), keyPoints ({text,startSeconds}[]), chapters ({title,startSeconds,summary}[]), takeaways (string[]), tags (string[]), topics (string[]), entities ({name,type,description,evidenceTimestamp}[]) y relations ({sourceName,targetName,relationType,explanation,evidenceTimestamp}[]).`,
+        contents: `${prompt}\n\nDevuelve un objeto JSON con estas claves exactas: headline (string), gist (string), cardSummary (string), sourceTranslation (string), sections ({title,points:{text,startSeconds}[]}[]), keyPoints ({text,startSeconds}[]), chapters ({title,startSeconds,summary}[]), takeaways (string[]), tags (string[]), topics (string[]), entities ({name,type,description,evidenceTimestamp}[]) y relations ({sourceName,targetName,relationType,explanation,evidenceTimestamp}[]).`,
         config: { systemInstruction, responseMimeType: "application/json" },
       });
     }
@@ -342,7 +343,7 @@ async function summarizeVideoWithProvider(title: string, channel: string, descri
     const usage = response.usageMetadata;
     if (usage) recordUsage("summary", GEMINI_TEXT_MODEL, usage.promptTokenCount || 0, usage.candidatesTokenCount || 0, 0);
     return {
-      summary: { gist: parsed.gist, cardSummary: parsed.cardSummary, sourceTranslation: parsed.sourceTranslation, sections: parsed.sections, keyPoints: parsed.keyPoints, chapters: parsed.chapters, takeaways: parsed.takeaways },
+      summary: { headline: typeof parsed.headline === "string" ? parsed.headline.trim().replace(/[.«»"]+$/g, "").slice(0, 90) : "", gist: parsed.gist, cardSummary: parsed.cardSummary, sourceTranslation: parsed.sourceTranslation, sections: parsed.sections, keyPoints: parsed.keyPoints, chapters: parsed.chapters, takeaways: parsed.takeaways },
       tags: normalizeCatalogTagIds(parsed.tags, sourceType, `${title} ${description}`),
     topics: Array.isArray(parsed.topics) ? parsed.topics.filter((topic) => typeof topic === "string") : [],
       entities: parsed.entities,
@@ -376,7 +377,7 @@ async function summarizeVideoWithProvider(title: string, channel: string, descri
   const usage = response.usage;
   if (usage) recordUsage("summary", TEXT_MODEL, usage.input_tokens, usage.output_tokens, openAICost(TEXT_MODEL, usage.input_tokens, usage.output_tokens));
   return {
-    summary: { gist: parsed.gist, cardSummary: parsed.cardSummary, sourceTranslation: parsed.sourceTranslation, sections: parsed.sections, keyPoints: parsed.keyPoints, chapters: parsed.chapters, takeaways: parsed.takeaways },
+    summary: { headline: typeof parsed.headline === "string" ? parsed.headline.trim().replace(/[.«»"]+$/g, "").slice(0, 90) : "", gist: parsed.gist, cardSummary: parsed.cardSummary, sourceTranslation: parsed.sourceTranslation, sections: parsed.sections, keyPoints: parsed.keyPoints, chapters: parsed.chapters, takeaways: parsed.takeaways },
     tags: normalizeCatalogTagIds(parsed.tags, sourceType, `${title} ${description}`),
     topics: Array.isArray(parsed.topics) ? parsed.topics.filter((topic) => typeof topic === "string") : [],
     entities: parsed.entities,

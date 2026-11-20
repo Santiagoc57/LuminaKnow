@@ -45,7 +45,7 @@ test("las carpetas guardan a mano, tienen regla opcional y absorben los espacios
   const find = (id: string) => listSmartSpaces().find((folder: { id: string }) => folder.id === id);
   assert.equal(find(viaje.id).itemIds.length, 2, "añadir dos veces no duplica");
   assert.throws(() => addSpaceItem(viaje.id, "no-existe"), /Fuente no encontrada/);
-  assert.throws(() => addSpaceItem("no-existe", "a"), /Carpeta no encontrada/);
+  assert.throws(() => addSpaceItem("no-existe", "a"), /Espacio no encontrado/);
   removeSpaceItem(viaje.id, "a");
   assert.deepEqual(find(viaje.id).itemIds, ["b"]);
 

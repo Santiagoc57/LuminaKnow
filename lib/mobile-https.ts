@@ -21,7 +21,8 @@ const serverCert = path.join(certDirectory, "server.crt");
 const serverMeta = path.join(certDirectory, "server.json");
 
 export function lanAddresses() {
-  return Object.values(os.networkInterfaces()).flat()
+  // Primero las del cable o la Wi-Fi (en0, en1…): son las que ven los otros equipos de la casa.
+  return Object.entries(os.networkInterfaces()).sort(([a], [b]) => Number(!a.startsWith("en")) - Number(!b.startsWith("en"))).flatMap(([, items]) => items ?? [])
     .filter((item): item is os.NetworkInterfaceInfo => Boolean(item && item.family === "IPv4" && !item.internal && !item.address.startsWith("169.254.")))
     .map((item) => item.address);
 }

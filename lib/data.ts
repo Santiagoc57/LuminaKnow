@@ -1,5 +1,9 @@
 import { getDb } from "./db";
 import { listHighlights } from "./highlights";
+import type { Highlight } from "./types";
+
+// Columnas para listados: todo menos la transcripción completa (pesada y no se usa en las tarjetas).
+const LIST_COLUMNS = "v.id, v.youtube_id, v.url, v.title, v.channel, v.thumbnail_url, v.duration_seconds, v.description, v.source_language, v.output_language, v.status, v.summary_json, v.transcript_source, v.error, v.added_by, v.created_at, v.updated_at, v.ready_at, v.custom_title, v.source_type, v.source_published_at, v.thread_status, v.archived_at, v.resurfaced_at, v.consumed_at, v.top_position, v.link_status, v.link_checked_at, v.snapshot_saved_at";
 import visionLabels from "./vision-labels-es.json";
 import type { AppVideo, LibraryCollection, SourceItem, SourceType } from "./types";
 import { safeJson } from "./utils";
@@ -85,7 +89,7 @@ export function listVideos(input: string | LibraryFilters = ""): AppVideo[] {
   if (query) {
     try {
       rows = db.prepare(`
-        SELECT v.*, p.name AS added_by_name
+        SELECT ${LIST_COLUMNS}, p.name AS added_by_name
         FROM library_search s
         JOIN videos v ON v.id = s.video_id
         JOIN profiles p ON p.id = v.added_by
@@ -97,12 +101,13 @@ export function listVideos(input: string | LibraryFilters = ""): AppVideo[] {
     }
   } else {
     rows = db.prepare(`
-      SELECT v.*, p.name AS added_by_name
+      SELECT ${LIST_COLUMNS}, p.name AS added_by_name
       FROM videos v JOIN profiles p ON p.id = v.added_by
       ORDER BY v.created_at DESC
     `).all() as VideoRow[];
   }
-  let videos = rows.filter((row) => Boolean(row.archived_at) === Boolean(filters.archived)).map((row) => hydrateVideo(row));
+  const relations = rows.length > 3 ? loadRelations() : undefined;
+  let videos = rows.filter((row) => Boolean(row.archived_at) === Boolean(filters.archived)).map((row) => hydrateVideo(row, false, relations));
   if (filters.sourceType) videos = videos.filter((video) => video.sourceType === filters.sourceType);
   if (filters.statuses?.length) videos = videos.filter((video) => filters.statuses!.includes(video.status));
   if (filters.author) videos = videos.filter((video) => video.channel.toLocaleLowerCase().includes(filters.author!.toLocaleLowerCase()));
@@ -146,8 +151,14 @@ export function getVideo(id: string) {
   return row ? hydrateVideo(row, true) : null;
 }
 
+type VisualRow = { videoId: string; text: string; labels: string; colors: string; width: number; height: number; description: string; objects: string; aiModel: string; error: string; hasPrint: number };
+const VISUAL_COLUMNS = "video_id AS videoId, text, labels_json AS labels, colors_json AS colors, width, height, description, objects_json AS objects, ai_model AS aiModel, error, length(feature_print) > 0 AS hasPrint";
+
 function visualAnalysis(videoId: string): AppVideo["visual"] {
-  const row = getDb().prepare("SELECT text, labels_json AS labels, colors_json AS colors, width, height, description, objects_json AS objects, ai_model AS aiModel, error, length(feature_print) > 0 AS hasPrint FROM visual_analysis WHERE video_id = ?").get(videoId) as { text: string; labels: string; colors: string; width: number; height: number; description: string; objects: string; aiModel: string; error: string; hasPrint: number } | undefined;
+  return mapVisual(getDb().prepare(`SELECT ${VISUAL_COLUMNS} FROM visual_analysis WHERE video_id = ?`).get(videoId) as VisualRow | undefined);
+}
+
+function mapVisual(row: VisualRow | undefined): AppVideo["visual"] {
   if (!row) return null;
   const names = visionLabels as Record<string, string>;
   return {
@@ -178,9 +189,55 @@ function trimPdfItems(items: SourceItem[]) {
   return kept;
 }
 
-function hydrateVideo(row: VideoRow, full = false): AppVideo {
+// Todo lo relacionado con las fuentes en unas pocas consultas (no varias por fuente): con miles de fuentes
+// es la diferencia entre segundos y milisegundos.
+type TagRow = Omit<AppVideo["tags"][number], "parentIds" | "active"> & { parentIdsCsv: string; active: number; videoId: string };
+type Relations = {
+  tags: Map<string, TagRow[]>;
+  collections: Map<string, AppVideo["collections"]>;
+  notes: Map<string, NonNullable<AppVideo["note"]>>;
+  items: Map<string, Array<Omit<SourceItem, "metadata"> & { metadataJson: string }>>;
+  highlights: Map<string, Highlight[]>;
+  visual: Map<string, VisualRow>;
+};
+
+function groupBy<T extends { videoId: string }>(rows: T[]) {
+  const map = new Map<string, T[]>();
+  for (const row of rows) { const list = map.get(row.videoId); if (list) list.push(row); else map.set(row.videoId, [row]); }
+  return map;
+}
+
+function loadRelations(): Relations {
   const db = getDb();
   const tags = db.prepare(`
+    SELECT vt.video_id AS videoId, t.id, COALESCE(t.catalog_key, '') AS catalogKey, t.name, t.color, t.level, t.sort_order AS sortOrder, t.active,
+      COALESCE(rel.parents, '') AS parentIdsCsv
+    FROM video_tags vt JOIN tags t ON t.id = vt.tag_id
+    LEFT JOIN (SELECT child_tag_id, GROUP_CONCAT(parent_tag_id) AS parents FROM tag_relations GROUP BY child_tag_id) rel ON rel.child_tag_id = t.id
+    WHERE t.active = 1 AND t.level IN ('primary', 'secondary', 'free')
+    ORDER BY vt.video_id, CASE t.level WHEN 'primary' THEN 0 WHEN 'secondary' THEN 1 ELSE 2 END, CASE WHEN vt.origin = 'manual' THEN 0 ELSE 1 END, vt.confidence DESC, t.sort_order, t.name COLLATE NOCASE
+  `).all() as TagRow[];
+  const collections = db.prepare("SELECT vc.video_id AS videoId, c.id, c.name, c.color FROM collections c JOIN video_collections vc ON vc.collection_id = c.id ORDER BY c.name").all() as Array<AppVideo["collections"][number] & { videoId: string }>;
+  const notes = db.prepare("SELECT n.video_id AS videoId, n.content, n.updated_at AS updatedAt, p.name AS updatedByName FROM notes n JOIN profiles p ON p.id = n.updated_by").all() as Array<NonNullable<AppVideo["note"]> & { videoId: string }>;
+  const items = db.prepare(`
+    SELECT video_id AS videoId, id, external_id AS externalId, ordinal, url, author_name AS authorName, author_handle AS authorHandle, text, published_at AS publishedAt, preview_url AS previewUrl, metadata_json AS metadataJson
+    FROM source_items ORDER BY video_id, ordinal
+  `).all() as Array<Omit<SourceItem, "metadata"> & { metadataJson: string; videoId: string }>;
+  const highlights = db.prepare("SELECT id, video_id AS videoId, quote, note, origin, created_at AS createdAt FROM highlights ORDER BY created_at").all() as Highlight[];
+  const visual = db.prepare(`SELECT ${VISUAL_COLUMNS} FROM visual_analysis`).all() as VisualRow[];
+  return {
+    tags: groupBy(tags),
+    collections: new Map([...groupBy(collections)].map(([id, list]) => [id, list.map(({ videoId: _videoId, ...item }) => item)])),
+    notes: new Map(notes.map(({ videoId, ...note }) => [videoId, note])),
+    items: groupBy(items),
+    highlights: groupBy(highlights),
+    visual: new Map(visual.map((row) => [row.videoId, row])),
+  };
+}
+
+function hydrateVideo(row: VideoRow, full = false, relations?: Relations): AppVideo {
+  const db = getDb();
+  const tags = (relations ? (relations.tags.get(row.id) ?? []) : db.prepare(`
     SELECT t.id, COALESCE(t.catalog_key, '') AS catalogKey, t.name, t.color, t.level,
       t.sort_order AS sortOrder, t.active,
       COALESCE((SELECT GROUP_CONCAT(parent_tag_id) FROM tag_relations WHERE child_tag_id = t.id), '') AS parentIdsCsv
@@ -188,26 +245,25 @@ function hydrateVideo(row: VideoRow, full = false): AppVideo {
     JOIN video_tags vt ON vt.tag_id = t.id WHERE vt.video_id = ?
       AND t.active = 1 AND t.level IN ('primary', 'secondary', 'free')
     ORDER BY CASE t.level WHEN 'primary' THEN 0 WHEN 'secondary' THEN 1 ELSE 2 END, CASE WHEN vt.origin = 'manual' THEN 0 ELSE 1 END, vt.confidence DESC, t.sort_order, t.name COLLATE NOCASE
-  `).all(row.id).map((tag) => {
-    const item = tag as Omit<AppVideo["tags"][number], "parentIds" | "active"> & { parentIdsCsv: string; active: number };
-    const { parentIdsCsv, ...rest } = item;
-    return { ...rest, parentIds: parentIdsCsv ? parentIdsCsv.split(",") : [], active: Boolean(item.active) };
+  `).all(row.id) as TagRow[]).map((tag) => {
+    const { parentIdsCsv, videoId: _videoId, ...rest } = tag;
+    return { ...rest, parentIds: parentIdsCsv ? parentIdsCsv.split(",") : [], active: Boolean(tag.active) };
   }) as AppVideo["tags"];
-  const collections = db.prepare(`
+  const collections = relations ? (relations.collections.get(row.id) ?? []) : db.prepare(`
     SELECT c.id, c.name, c.color FROM collections c
     JOIN video_collections vc ON vc.collection_id = c.id WHERE vc.video_id = ? ORDER BY c.name
   `).all(row.id) as AppVideo["collections"];
-  const note = db.prepare(`
+  const note = relations ? relations.notes.get(row.id) : db.prepare(`
     SELECT n.content, n.updated_at AS updatedAt, p.name AS updatedByName
     FROM notes n JOIN profiles p ON p.id = n.updated_by WHERE n.video_id = ?
   `).get(row.id) as AppVideo["note"] | undefined;
-  const sourceItemRows = db.prepare(`
+  const sourceItemRows = relations ? (relations.items.get(row.id) ?? []) : db.prepare(`
     SELECT id, external_id AS externalId, ordinal, url, author_name AS authorName,
       author_handle AS authorHandle, text, published_at AS publishedAt, preview_url AS previewUrl,
       metadata_json AS metadataJson
     FROM source_items WHERE video_id = ? ORDER BY ordinal
   `).all(row.id) as Array<Omit<SourceItem, "metadata"> & { metadataJson: string }>;
-  const allItems = sourceItemRows.map(({ metadataJson, ...item }) => ({ ...item, metadata: safeJson<SourceItem["metadata"]>(metadataJson, {}) }));
+  const allItems = sourceItemRows.map(({ metadataJson, ...item }) => { const { videoId: _videoId, ...rest } = item as typeof item & { videoId?: string }; return { ...rest, metadata: safeJson<SourceItem["metadata"]>(metadataJson, {}) }; });
   const sourceItems = row.source_type === "pdf" && !full ? trimPdfItems(allItems) : allItems;
   const rawSummary = safeJson<unknown>(row.summary_json, null);
   const needsSummaryNormalization = summaryNeedsTimestampNormalization(rawSummary);
@@ -232,8 +288,8 @@ function hydrateVideo(row: VideoRow, full = false): AppVideo {
     summary,
     transcriptSource: row.transcript_source,
     error: row.error,
-    highlights: listHighlights(row.id),
-    visual: visualAnalysis(row.id),
+    highlights: relations ? (relations.highlights.get(row.id) ?? []) : listHighlights(row.id),
+    visual: relations ? mapVisual(relations.visual.get(row.id)) : visualAnalysis(row.id),
     archivedAt: row.archived_at ?? null,
     resurfacedAt: row.resurfaced_at ?? null,
     consumedAt: row.consumed_at ?? null,

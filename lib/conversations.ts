@@ -1,3 +1,6 @@
+import { listVideos } from "./data";
+import { spaceQueryMatches } from "./library-query";
+import { listCatalogTags } from "./mobile-library";
 import { getDb } from "./db";
 import { generateChatAnswer } from "./scoped-chat";
 import type { AvailableModel, ChatScopeType, ChatSourceSelection, Citation, ConversationMessage, ConversationSummary, ConversationTurn } from "./types";
@@ -67,6 +70,15 @@ export function resolveEffectiveSources(selectionInput: ChatSourceSelection) {
       ) SELECT DISTINCT vc.video_id AS id FROM video_collections vc JOIN videos v ON v.id = vc.video_id
       WHERE v.status = 'ready' AND vc.collection_id IN (SELECT id FROM selected_collections)`).all(...selection.collectionIds) as Array<{ id: string }>;
     rows.forEach((row) => ids.add(row.id));
+    // Espacios con regla (p. ej. «#Política tipo:video»): también lo que entra por la regla.
+    let rules: Array<{ query: string }> = [];
+    try { rules = db.prepare(`SELECT query FROM collections WHERE id IN (${placeholders(selection.collectionIds)}) AND query <> ''`).all(...selection.collectionIds) as Array<{ query: string }>; } catch { rules = []; }
+    if (rules.length) {
+      const catalog = listCatalogTags();
+      for (const video of listVideos("")) {
+        if (video.status === "ready" && rules.some((rule) => spaceQueryMatches(rule.query, video, catalog))) ids.add(video.id);
+      }
+    }
   }
   if (selection.tagIds.length) {
     const rows = db.prepare(`SELECT vt.video_id AS id FROM video_tags vt JOIN videos v ON v.id = vt.video_id

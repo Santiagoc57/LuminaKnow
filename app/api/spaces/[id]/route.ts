@@ -21,7 +21,7 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   try {
     await requireProfile();
     const { id } = await context.params;
-    if (!deleteSmartSpace(id)) return NextResponse.json({ error: "Carpeta no encontrada." }, { status: 404 });
+    if (!deleteSmartSpace(id)) return NextResponse.json({ error: "Espacio no encontrado." }, { status: 404 });
     return NextResponse.json({ ok: true });
   } catch (error) { return apiError(error); }
 }

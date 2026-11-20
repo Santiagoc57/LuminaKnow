@@ -4,6 +4,9 @@ import { requireProfile } from "@/lib/auth";
 import { getDb, refreshVideoSearch } from "@/lib/db";
 import { apiError } from "@/lib/http";
 import { syncVideoMemberships } from "@/lib/knowledge";
+import { suggestEarlySourceMetadata } from "@/lib/ai";
+import { decideCatalogTags } from "@/lib/tag-decisions";
+import type { SourceType } from "@/lib/types";
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
@@ -27,6 +30,27 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     syncVideoMemberships(id);
     refreshVideoSearch(id);
     return NextResponse.json({ ok: true });
+  } catch (error) {
+    return apiError(error);
+  }
+}
+
+// «Sugerir etiquetas»: la IA vuelve a leer la fuente y propone etiquetas del catálogo que aún no tiene.
+export async function POST(_: Request, context: { params: Promise<{ id: string }> }) {
+  try {
+    await requireProfile();
+    const { id } = await context.params;
+    const db = getDb();
+    const video = db.prepare("SELECT source_type AS sourceType, COALESCE(NULLIF(custom_title, ''), title) AS title, channel, description, summary_json AS summaryJson, transcript_text AS transcript FROM videos WHERE id = ?").get(id) as { sourceType: SourceType; title: string; channel: string; description: string; summaryJson: string; transcript: string } | undefined;
+    if (!video) throw new Error("Fuente no encontrada.");
+    const summary = JSON.parse(video.summaryJson || "{}") as { gist?: string; cardSummary?: string };
+    const content = [summary.gist, summary.cardSummary, video.description, (video.transcript || "").slice(0, 4_000)].filter(Boolean).join("\n\n");
+    const decided = await decideCatalogTags({ title: video.title, author: video.channel, summary: [summary.gist, summary.cardSummary].filter(Boolean).join(" "), content }).catch(() => null);
+    const keys = decided?.length ? decided : (await suggestEarlySourceMetadata({ title: video.title, author: video.channel, content, sourceType: video.sourceType })).tagIds;
+    const assigned = new Set((db.prepare("SELECT tag_id AS id FROM video_tags WHERE video_id = ?").all(id) as Array<{ id: string }>).map((row) => row.id));
+    const tags = keys.map((key) => db.prepare("SELECT id, name, level, color FROM tags WHERE catalog_key = ? AND active = 1").get(key) as { id: string; name: string; level: string; color: string } | undefined)
+      .filter((tag): tag is { id: string; name: string; level: string; color: string } => Boolean(tag) && !assigned.has(tag!.id));
+    return NextResponse.json({ tags });
   } catch (error) {
     return apiError(error);
   }

@@ -11,10 +11,11 @@ const baseManifest = {
   manifest_version: 3,
   name: "Lúmina Companion",
   description: "Guarda páginas en Lúmina y recupera conocimiento relacionado mientras navegas.",
-  version: "1.3.0",
+  version: "1.8.0",
   permissions: ["storage", "activeTab", "scripting", "contextMenus", "tabs"],
   host_permissions: ["<all_urls>"],
-  action: { default_popup: "popup.html", default_title: "Guardar en Lúmina", default_icon: { 16: "icons/16.png", 32: "icons/32.png", 48: "icons/48.png", 128: "icons/128.png" } },
+  // Sin popup fijo: el icono abre un diálogo centrado en la página (el panel clásico queda para páginas especiales).
+  action: { default_title: "Guardar en Lúmina", default_icon: { 16: "icons/16.png", 32: "icons/32.png", 48: "icons/48.png", 128: "icons/128.png" } },
   icons: { 16: "icons/16.png", 32: "icons/32.png", 48: "icons/48.png", 128: "icons/128.png" },
   options_ui: { page: "options.html", open_in_tab: true },
   commands: {

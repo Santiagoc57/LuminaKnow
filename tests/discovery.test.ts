@@ -51,7 +51,7 @@ test("archivar saca la fuente de la biblioteca, los espacios persisten y la exte
   const { createSmartSpace, deleteSmartSpace, listSmartSpaces } = await import(`../lib/spaces?discovery=${stamp}`);
   const space = createSmartSpace({ name: "Ideas", color: "#123456", query: "#ideas" });
   assert.deepEqual(listSmartSpaces().map((item: { name: string }) => item.name), ["Ideas"]);
-  assert.throws(() => createSmartSpace({ name: "ideas", color: "#123456", query: "x" }), /Ya tienes una carpeta/);
+  assert.throws(() => createSmartSpace({ name: "ideas", color: "#123456", query: "x" }), /Ya tienes un espacio/);
   assert.equal(deleteSmartSpace(space.id), true);
 
   db.close(); global.__luminaDb = undefined;

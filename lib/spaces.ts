@@ -52,7 +52,7 @@ export function createSmartSpace(input: { name: string; color?: string; query?: 
   ensureFolderRules(db);
   const name = input.name.trim();
   const query = input.query?.trim() || "";
-  if (db.prepare("SELECT 1 FROM collections WHERE parent_id IS NULL AND name = ? COLLATE NOCASE").get(name)) throw new Error("Ya tienes una carpeta con ese nombre.");
+  if (db.prepare("SELECT 1 FROM collections WHERE parent_id IS NULL AND name = ? COLLATE NOCASE").get(name)) throw new Error("Ya tienes un espacio con ese nombre.");
   const { next } = db.prepare("SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM collections WHERE parent_id IS NULL").get() as { next: number };
   const now = new Date().toISOString();
   const folder = { id: makeId("col"), name, color: input.color || RANDOM_COLORS[crypto.randomInt(RANDOM_COLORS.length)], query, createdAt: now };
@@ -67,11 +67,11 @@ export function updateSmartSpace(id: string, input: { name?: string; query?: str
   const db = getDb();
   ensureFolderRules(db);
   const current = db.prepare("SELECT id, parent_id AS parentId FROM collections WHERE id = ?").get(id) as { id: string; parentId: string | null } | undefined;
-  if (!current) throw new Error("Carpeta no encontrada.");
+  if (!current) throw new Error("Espacio no encontrado.");
   if (input.name !== undefined) {
     const name = input.name.trim();
-    if (!name) throw new Error("Ponle un nombre a la carpeta.");
-    if (db.prepare("SELECT 1 FROM collections WHERE parent_id IS ? AND name = ? COLLATE NOCASE AND id <> ?").get(current.parentId, name, id)) throw new Error("Ya tienes una carpeta con ese nombre.");
+    if (!name) throw new Error("Ponle un nombre al espacio.");
+    if (db.prepare("SELECT 1 FROM collections WHERE parent_id IS ? AND name = ? COLLATE NOCASE AND id <> ?").get(current.parentId, name, id)) throw new Error("Ya tienes un espacio con ese nombre.");
     db.prepare("UPDATE collections SET name = ?, updated_at = ? WHERE id = ?").run(name, new Date().toISOString(), id);
   }
   if (input.query !== undefined) db.prepare("UPDATE collections SET query = ?, updated_at = ? WHERE id = ?").run(input.query.trim(), new Date().toISOString(), id);
@@ -86,7 +86,7 @@ export function deleteSmartSpace(id: string) {
 
 export function addSpaceItem(folderId: string, videoId: string) {
   const db = getDb();
-  if (!db.prepare("SELECT 1 FROM collections WHERE id = ?").get(folderId)) throw new Error("Carpeta no encontrada.");
+  if (!db.prepare("SELECT 1 FROM collections WHERE id = ?").get(folderId)) throw new Error("Espacio no encontrado.");
   if (!db.prepare("SELECT 1 FROM videos WHERE id = ?").get(videoId)) throw new Error("Fuente no encontrada.");
   db.prepare("INSERT OR IGNORE INTO video_collections(video_id, collection_id) VALUES(?, ?)").run(videoId, folderId);
 }

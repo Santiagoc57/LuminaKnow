@@ -19,6 +19,9 @@ export type SummarySection = {
 
 export type Summary = {
   gist: string;
+  // Título descriptivo escrito por la IA (para tweets, capturas y páginas sin un título útil).
+  headline?: string;
+  originalTitle?: string;
   cardSummary?: string;
   sourceTranslation?: string;
   sections?: SummarySection[];
@@ -69,6 +72,7 @@ export type SourceItem = {
     parentTitle?: string;
     parentUrl?: string;
     capturedBy?: string;
+    wordCount?: number;
   };
 };
 

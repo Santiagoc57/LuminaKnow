@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireProfile } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { listVideos } from "@/lib/data";
+import { slimVideo } from "@/lib/slim-video";
 import { getAIProvider, getMonthlyUsage, hasAIKey, listAvailableModels } from "@/lib/ai";
 import { recoverPendingJobs } from "@/lib/worker";
 import { apiError } from "@/lib/http";
@@ -41,8 +42,8 @@ export async function GET(request: Request) {
     });
     return NextResponse.json({
       profile,
-      videos: listVideos(query),
-      archived: listVideos({ archived: true }),
+      videos: listVideos(query).map(slimVideo),
+      archived: listVideos({ archived: true }).map(slimVideo),
       spaces: listSmartSpaces(),
       // Último fallo de la IA al resumir (para el aviso del inicio): solo el mensaje, sin datos de la fuente.
       aiLastError: (() => { const error = (globalThis as { __luminaLastSummaryError?: unknown }).__luminaLastSummaryError; return error instanceof Error ? error.message.slice(0, 180) : ""; })(),

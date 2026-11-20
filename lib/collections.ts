@@ -16,7 +16,7 @@ function requireCollection(collectionId: string) {
 
 export function assertCollectionParent(collectionId: string, parentId: string | null) {
   if (!parentId) return;
-  if (collectionId === parentId) throw new Error("Una carpeta no puede contenerse a sí misma.");
+  if (collectionId === parentId) throw new Error("Un espacio no puede contenerse a sí misma.");
   requireCollection(parentId);
   const descendants = getDb().prepare(`
     WITH RECURSIVE descendants(id) AS (
@@ -24,7 +24,7 @@ export function assertCollectionParent(collectionId: string, parentId: string | 
       UNION ALL SELECT c.id FROM collections c JOIN descendants d ON c.parent_id = d.id
     ) SELECT id FROM descendants
   `).all(collectionId) as Array<{ id: string }>;
-  if (descendants.some((item) => item.id === parentId)) throw new Error("Ese movimiento crearía un ciclo entre carpetas.");
+  if (descendants.some((item) => item.id === parentId)) throw new Error("Ese movimiento crearía un ciclo entre espacios.");
 }
 
 export function reorderCollection(collectionId: string, parentId: string | null, sortOrder: number) {

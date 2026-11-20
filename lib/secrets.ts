@@ -5,7 +5,7 @@ import crypto from "node:crypto";
 const dataDirectory = process.env.LUMINA_DATA_DIR || path.join(/* turbopackIgnore: true */ process.cwd(), "data");
 const secretsPath = path.join(dataDirectory, "secrets.json");
 
-type Secrets = { geminiApiKey?: string; openaiApiKey?: string; sessionSecret?: string };
+type Secrets = { geminiApiKey?: string; openaiApiKey?: string; sessionSecret?: string; telegramBotToken?: string; telegramChatId?: number };
 
 function readSecrets(): Secrets {
   try {
@@ -40,6 +40,19 @@ export function setGeminiKey(geminiApiKey: string) {
   const secrets = readSecrets();
   if (geminiApiKey.trim()) secrets.geminiApiKey = geminiApiKey.trim();
   else delete secrets.geminiApiKey;
+  writeSecrets(secrets);
+}
+
+// Bot de Telegram propio: su clave y el chat (tu cuenta) que puede guardar en LUMINA.
+export function getTelegramConfig() {
+  const secrets = readSecrets();
+  return { token: secrets.telegramBotToken || "", chatId: secrets.telegramChatId || 0 };
+}
+
+export function setTelegramConfig(patch: { token?: string; chatId?: number | null }) {
+  const secrets = readSecrets();
+  if (patch.token !== undefined) { secrets.telegramBotToken = patch.token || undefined; secrets.telegramChatId = undefined; }
+  if (patch.chatId !== undefined) secrets.telegramChatId = patch.chatId || undefined;
   writeSecrets(secrets);
 }
 

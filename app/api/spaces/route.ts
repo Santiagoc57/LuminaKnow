@@ -7,7 +7,7 @@ import { createSmartSpace, listSmartSpaces, reorderSmartSpaces } from "@/lib/spa
 export const runtime = "nodejs";
 
 const spaceSchema = z.object({
-  name: z.string().trim().min(1, "Ponle un nombre a la carpeta.").max(60),
+  name: z.string().trim().min(1, "Ponle un nombre al espacio.").max(60),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   query: z.string().trim().max(300).optional(),
   videoId: z.string().min(1).optional(),

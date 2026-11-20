@@ -13,6 +13,7 @@ import { deleteMediaForVideo } from "@/lib/media";
 import { addToShelf, removeFromShelf } from "@/lib/shelf";
 import { noteConnections, renameLinksEverywhere } from "@/lib/notes";
 import { relatedSources } from "@/lib/related";
+import { retitleOne } from "@/lib/retitle";
 import type { SourceType } from "@/lib/types";
 import { z } from "zod";
 
@@ -34,7 +35,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   try {
     const profile = await requireProfile();
     const { id } = await context.params;
-    const body = z.object({ action: z.enum(["retry", "regenerate_metadata", "archive", "unarchive", "keep", "consume", "unconsume", "pin", "unpin"]).optional(), title: z.string().trim().max(200).optional() }).parse(await request.json());
+    const body = z.object({ action: z.enum(["retry", "regenerate_metadata", "archive", "unarchive", "keep", "consume", "unconsume", "pin", "unpin", "retitle"]).optional(), title: z.string().trim().max(200).optional() }).parse(await request.json());
     if (body.title !== undefined) {
       if (!body.title) throw new Error("El título no puede estar vacío.");
       const previous = getDb().prepare("SELECT COALESCE(NULLIF(custom_title, ''), title) AS title FROM videos WHERE id = ?").get(id) as { title: string } | undefined;
@@ -45,6 +46,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       return NextResponse.json({ ok: true });
     }
     if (body.action === "pin") { addToShelf(id); return NextResponse.json({ ok: true }); }
+    if (body.action === "retitle") return NextResponse.json({ ok: true, title: await retitleOne(id) });
     if (body.action === "unpin") { removeFromShelf(id); return NextResponse.json({ ok: true }); }
     if (body.action === "consume" || body.action === "unconsume") {
       const result = getDb().prepare("UPDATE videos SET consumed_at = ? WHERE id = ?").run(body.action === "consume" ? new Date().toISOString() : null, id);

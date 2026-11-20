@@ -188,6 +188,87 @@ async function resurface(metadata, suppliedTags) {
   return result;
 }
 
+// ---- Captura de la página como portada (como mymind) ----
+// En redes y videos se mantiene la imagen de la publicación; en el resto de webs, una foto de lo que estás viendo.
+const NO_SCREENSHOT = /(^|\.)(x\.com|twitter\.com|reddit\.com|youtube\.com|youtu\.be|instagram\.com|facebook\.com|tiktok\.com|vimeo\.com)$/;
+async function pageScreenshot(tab) {
+  try {
+    if (!tab?.active || !/^https?:/.test(tab.url || "")) return "";
+    if (NO_SCREENSHOT.test(new URL(tab.url).hostname.replace(/^www\./, ""))) return "";
+    return await extensionApi.tabs.captureVisibleTab(tab.windowId, { format: "jpeg", quality: 82 });
+  } catch { return ""; }
+}
+async function attachScreenshot(result, shot) {
+  if (!shot || !result?.id) return;
+  // Si ya estaba guardada con su captura, no se cambia.
+  try { await request("/api/extension/cover", { id: result.id, imageBase64: shot, onlyIfMissing: Boolean(result.duplicate) }); } catch { /* la portada es un extra */ }
+}
+async function captureTabWithShot(tab, options = {}) {
+  const shot = await pageScreenshot(tab);
+  const result = await captureTab(tab, options);
+  await attachScreenshot(result, shot);
+  return result;
+}
+
+// ---- Diálogo de guardado centrado (lo dibuja content.js) ----
+async function openDialog(tab) {
+  try {
+    await extensionApi.tabs.sendMessage(tab.id, { type: "LUMINA_OPEN_DIALOG" });
+  } catch {
+    // Páginas donde la extensión no puede dibujar (ajustes del navegador, tiendas…): el panel clásico.
+    await extensionApi.action.setPopup({ tabId: tab.id, popup: "popup.html" });
+    try { await extensionApi.action.openPopup(); } catch { /* el usuario puede volver a pulsar el icono */ }
+  }
+}
+extensionApi.action.onClicked.addListener((tab) => { if (tab?.id) void openDialog(tab); });
+// El panel clásico de respaldo solo vale para esa página: al navegar, el icono vuelve a abrir el diálogo.
+extensionApi.tabs.onUpdated.addListener((tabId, change) => { if (change.status === "loading") extensionApi.action.setPopup({ tabId, popup: "" }).catch?.(() => {}); });
+
+async function dialogContext(tab, pageText, item) {
+  const config = await settings();
+  if (!config.token) return { connected: false };
+  // Abierto desde un botón (un tweet, un video, una imagen): se sugiere para ese elemento, no para la página.
+  if (item?.url) {
+    const metadata = { url: item.url, title: item.title, description: "", imageUrl: item.imageUrl || "", siteName: item.siteName || "", author: item.author || "" };
+    const suggestion = await request("/api/extension/suggest", { url: item.url, title: item.title, description: "", author: item.author || "", text: (item.text || "").slice(0, 5000) });
+    return { connected: true, metadata, serverUrl: config.serverUrl, defaultMode: config.defaultMode, ...suggestion };
+  }
+  const metadata = await collectTabMetadata(tab);
+  const structured = await readStructured(tab);
+  // En X y Reddit, el texto de la publicación (más fiable que los metadatos de la página).
+  const text = structured?.items?.length ? structured.items.map((item) => item.text).join("\n\n") : pageText || "";
+  if (structured?.title) metadata.title = structured.title;
+  const suggestion = await request("/api/extension/suggest", { url: structured?.url || metadata.url, title: metadata.title, description: metadata.description || "", author: structured?.channel || metadata.author || "", text: text.slice(0, 5000) });
+  return { connected: true, metadata, serverUrl: config.serverUrl, defaultMode: config.defaultMode, ...suggestion };
+}
+
+async function dialogSave(tab, message) {
+  const tags = (message.tagKeys || []).slice(0, 5).map((key) => ({ key }));
+  const mode = message.analyze ? "process" : "save";
+  const payload = message.payload;
+  if (payload?.type) {
+    let result;
+    if (payload.type === "LUMINA_SAVE_STRUCTURED") result = await captureStructured(payload.data, { mode, tags });
+    else if (payload.type === "LUMINA_SAVE_LINK") result = await capture(linkMetadata(payload.url, payload.title), mode, { tags });
+    else if (payload.type === "LUMINA_SAVE_IMAGE") result = await saveImage(payload.srcUrl, payload.pageUrl, payload.title);
+    else throw new Error("No se reconoce qué guardar.");
+    return finishDialogSave(result, message);
+  }
+  // La captura se toma primero (el diálogo ya se escondió) y se adjunta al guardar.
+  const shot = await pageScreenshot(tab);
+  let result = await captureTab(tab, { mode, tags });
+  await attachScreenshot(result, shot);
+  return finishDialogSave(result, message);
+}
+
+async function finishDialogSave(result, message) {
+  // Título escrito por ti en el diálogo: se respeta (la IA no lo cambia al analizar).
+  if (message.title && result?.id) await request("/api/extension/update", { id: result.id, title: message.title });
+  if (message.boardId && result?.id) result = await intoBoard(Promise.resolve(result), message.boardId);
+  if (message.note && result?.id) await request("/api/extension/note", { id: result.id, note: message.note });
+  return result;
+}
+
 async function captureCurrent(mode) {
   return captureTab(await activeTab(), { mode });
 }
@@ -204,14 +285,15 @@ extensionApi.runtime.onInstalled.addListener(() => {
 extensionApi.commands.onCommand.addListener(async (command) => {
   if (command !== "save-current") return;
   const tab = await activeTab();
-  report(tab, captureTab(tab));
+  report(tab, captureTabWithShot(tab));
 });
 
 extensionApi.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "lumina-save-link" && info.linkUrl) return report(tab, capture(linkMetadata(info.linkUrl, info.linkText), undefined));
   if (info.menuItemId === "lumina-save-image" && info.srcUrl) return report(tab, saveImage(info.srcUrl, info.pageUrl || "", tab?.title || ""));
-  if (info.menuItemId === "lumina-save-clip" && tab) return report(tab, captureTab(tab, { clip: info.selectionText || "" }));
-  if (tab) report(tab, captureTab(tab));
+  // Recorte: el aviso pide una nota al momento («¿Por qué guardas este recorte?»).
+  if (info.menuItemId === "lumina-save-clip" && tab) return report(tab, captureTab(tab, { clip: info.selectionText || "" }).then((result) => ({ ...result, askNote: true, clip: info.selectionText || "" })));
+  if (tab) report(tab, captureTabWithShot(tab));
 });
 
 extensionApi.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -233,6 +315,16 @@ extensionApi.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "LUMINA_CREATE_BOARD") return request("/api/extension/boards", { name: message.name });
     if (message.type === "LUMINA_COLLECT") return collect(message.id, message.collectionId);
     if (message.type === "LUMINA_PAGE_HIGHLIGHTS") { const config = await settings(); if (!config.token) return { quotes: [] }; return request(`/api/extension/highlights?url=${encodeURIComponent(message.url)}`); }
+    if (message.type === "LUMINA_CLIP_NOTE") return request("/api/extension/clip-note", { id: message.id, quote: message.quote, note: message.note });
+    if (message.type === "LUMINA_DIALOG_CONTEXT") return dialogContext(sender.tab, message.pageText, message.item);
+    if (message.type === "LUMINA_DIALOG_SAVE") return dialogSave(sender.tab, message);
+    if (message.type === "LUMINA_DIALOG_EXTRA") {
+      if (message.boardId) await collect(message.id, message.boardId);
+      if (message.note) await request("/api/extension/note", { id: message.id, note: message.note });
+      if (message.title || message.tagKeys?.length) await request("/api/extension/update", { id: message.id, title: message.title || undefined, tagKeys: message.tagKeys || [] });
+      return { ok: true };
+    }
+    if (message.type === "LUMINA_IS_LUMINA") { const config = await settings(); try { return { lumina: new URL(config.serverUrl).origin === message.origin }; } catch { return { lumina: false }; } }
     if (message.type === "LUMINA_ITEM") return request(`/api/extension/item?id=${encodeURIComponent(message.id)}`);
     if (message.type === "LUMINA_ADD_NOTE") return request("/api/extension/note", { id: message.id, note: message.note });
     if (message.type === "LUMINA_OPEN") { const config = await settings(); await extensionApi.tabs.create({ url: `${config.serverUrl}${message.path || "/"}` }); return { ok: true }; }

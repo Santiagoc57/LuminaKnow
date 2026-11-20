@@ -30,3 +30,27 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return apiError(error);
   }
 }
+
+// Regenerar la portada de una web: nueva captura de la página (o su imagen para compartir).
+export async function PUT(_: Request, context: { params: Promise<{ id: string }> }) {
+  try {
+    await requireProfile();
+    const { id } = await context.params;
+    const db = getDb();
+    const row = db.prepare("SELECT url FROM videos WHERE id = ?").get(id) as { url: string } | undefined;
+    if (!row) return NextResponse.json({ error: "Fuente no encontrada." }, { status: 404 });
+    const { screenshotPage, shareImage } = await import("@/lib/page-shot");
+    const bytes = (await screenshotPage(row.url)) ?? (await shareImage(row.url));
+    const kind = bytes ? sniffImage(bytes) : null;
+    if (!bytes || !kind) throw new Error("No se pudo tomar una nueva portada de esta página.");
+    const { url } = saveMedia(makeId("cover"), bytes, kind);
+    db.transaction(() => {
+      db.prepare("UPDATE videos SET thumbnail_url = ?, updated_at = ? WHERE id = ?").run(url, new Date().toISOString(), id);
+      db.prepare("UPDATE source_items SET preview_url = ? WHERE video_id = ? AND ordinal = 0").run(url, id);
+    })();
+    refreshVideoSearch(id);
+    return NextResponse.json({ ok: true, url });
+  } catch (error) {
+    return apiError(error);
+  }
+}

@@ -92,7 +92,11 @@ export function normalizeSummary(raw: unknown, chunks: EvidenceChunk[] = []): Su
     });
     return points.length ? [{ title: candidate.title, points }] : [];
   }) : [];
+  const extra = value as Record<string, unknown>;
   return {
+    // El titular de la IA y el título anterior (para volver atrás) se conservan siempre.
+    ...(typeof extra.headline === "string" && extra.headline ? { headline: extra.headline } : {}),
+    ...(typeof extra.originalTitle === "string" && extra.originalTitle ? { originalTitle: extra.originalTitle } : {}),
     gist: typeof value.gist === "string" ? value.gist : "",
     cardSummary: typeof value.cardSummary === "string" ? value.cardSummary : "",
     sourceTranslation: typeof value.sourceTranslation === "string" ? value.sourceTranslation : "",
