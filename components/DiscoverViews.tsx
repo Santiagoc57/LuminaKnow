@@ -1402,7 +1402,7 @@ export function MosaicCard({ video, onOpen, selected = false, selecting = false,
   onOpen: () => void;
   selected?: boolean;
   selecting?: boolean;
-  onToggleSelect?: () => void;
+  onToggleSelect?: (shift?: boolean) => void;
   onMenu?: (x: number, y: number) => void;
   saver?: BoardSaver;
   onVibe?: (video: AppVideo) => void;
@@ -1421,7 +1421,9 @@ export function MosaicCard({ video, onOpen, selected = false, selecting = false,
   return <div className={`lv-tile src-${accent.key} ${artwork ? "has-art" : isQuote ? "is-quote" : "is-text"} ${selected ? "selected" : ""}`} aria-pressed={selecting ? selected : undefined}
     {...pressable(press)}
     onMouseDown={(event) => { if (event.shiftKey) event.preventDefault(); }}
-    onClick={(event) => { if (onToggleSelect && (event.shiftKey || selecting)) onToggleSelect(); else onOpen(); }}
+    draggable={!selecting}
+    onDragStart={(event) => dragOut(event, video)}
+    onClick={(event) => { if (onToggleSelect && (event.shiftKey || selecting)) onToggleSelect(event.shiftKey); else onOpen(); }}
     onContextMenu={(event) => { if (!onMenu) return; event.preventDefault(); onMenu(event.clientX, event.clientY); }}
     onDragOver={(event) => { if (productOf(video) && event.dataTransfer.types.includes("Files")) { event.preventDefault(); event.stopPropagation(); event.currentTarget.classList.add("drop-target"); } }}
     onDragLeave={(event) => event.currentTarget.classList.remove("drop-target")}
@@ -1432,7 +1434,7 @@ export function MosaicCard({ video, onOpen, selected = false, selecting = false,
       event.preventDefault(); event.stopPropagation(); event.currentTarget.classList.remove("drop-target");
       void replaceCover(video.id, file).then(() => onCoverChanged?.()).catch(() => undefined);
     }}>
-    {(selecting || selected) && <i className="lv-tile-check" aria-hidden>{selected && <Check size={13} />}</i>}
+    {selected && <span className="lv-tile-selected-bar" aria-hidden>Seleccionada<i><Check size={11} strokeWidth={3} /></i></span>}
     {video.sourceType === "note" && quoteFromNote(video.note?.content || "") ? <span className="lv-tile-quote-card"><b aria-hidden>“</b>{(() => { const quote = quoteFromNote(video.note?.content || "")!; return <>{quote.text.length > 280 ? `${quote.text.slice(0, 277)}…` : quote.text}<b aria-hidden>”</b>{quote.author && <small>{quote.author}</small>}</>; })()}</span>
       : video.sourceType === "palette" ? <span className="lv-tile-palette">{(video.visual?.colors ?? []).map((swatch) => <i key={swatch.hex} style={{ background: swatch.hex, flexGrow: Math.max(swatch.share, 0.08) }}><b>{swatch.hex.toUpperCase()}</b></i>)}</span>
       : artwork ? <span className="lv-tile-art"><img src={tileImage} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => { if (tileImage !== artwork) setUseOriginal(true); else setArtFailed(true); }} /><TileKind video={video} />
@@ -1464,6 +1466,26 @@ function RegenerateCover({ video, onDone }: { video: AppVideo; onDone?: () => vo
     catch { setState("error"); window.setTimeout(() => setState("idle"), 2500); }
   };
   return <button type="button" className={`lv-browser-regen ${state}`} disabled={state === "busy"} onClick={() => void regenerate()} title={state === "error" ? "No se pudo tomar una nueva captura" : "Regenerar portada"} aria-label="Regenerar portada">{state === "busy" ? <LoaderCircle className="spin" size={13} /> : <RefreshCw size={13} />}</button>;
+}
+
+// Arrastrar una tarjeta fuera de LUMINA (como en mymind): la imagen o el PDF original van al Escritorio, a
+// Mail o a cualquier app; una web o un tweet se sueltan como enlace. Dentro de LUMINA sirve para meterla en un espacio.
+function dragOut(event: React.DragEvent, video: AppVideo) {
+  const data = event.dataTransfer;
+  data.effectAllowed = "copyMove";
+  data.setData("application/x-lumina-source", video.id);
+  const origin = window.location.origin;
+  const safeName = (video.title || "lumina").replace(/[\\/:*?"<>|\n\r]+/g, " ").trim().slice(0, 80) || "lumina";
+  if (video.sourceType === "pdf") {
+    data.setData("DownloadURL", `application/pdf:${safeName}.pdf:${origin}/api/media/${video.id}.pdf`);
+  } else if ((video.sourceType === "image" || video.sourceType === "palette") && video.thumbnailUrl) {
+    const url = new URL(video.thumbnailUrl, origin).href;
+    const ext = (url.split("?")[0].match(/\.(png|jpe?g|webp|gif|heic)$/i)?.[1] || "png").toLowerCase();
+    data.setData("DownloadURL", `image/${ext === "jpg" ? "jpeg" : ext}:${safeName}.${ext}:${url}`);
+  }
+  const link = video.url && !/^(lumina:|local:)/.test(video.url) ? video.url : "";
+  if (link) { data.setData("text/uri-list", link); data.setData("text/plain", link); }
+  else data.setData("text/plain", video.title);
 }
 
 // Icono pequeño que dice qué es cada tarjeta (video, web, imagen, PDF…).
@@ -1580,12 +1602,13 @@ function TileMenu({ menu, catalog, spaces, onClose, onChanged, onOpen, onVibe, o
   </div>;
 }
 
-export function MosaicGrid({ videos, onOpen, selection, onToggleSelect, catalog = [], spaces = [], onChanged, onVibe, quickNote = false, saver }: {
+export function MosaicGrid({ videos, onOpen, selection, onToggleSelect, onSelectRange, catalog = [], spaces = [], onChanged, onVibe, quickNote = false, saver }: {
   saver?: BoardSaver;
   videos: AppVideo[];
   onOpen: (id: string) => void;
   selection?: Set<string>;
   onToggleSelect?: (id: string) => void;
+  onSelectRange?: (ids: string[]) => void;
   catalog?: LibraryTag[];
   spaces?: SmartSpace[];
   onChanged?: () => Promise<void>;
@@ -1601,10 +1624,21 @@ export function MosaicGrid({ videos, onOpen, selection, onToggleSelect, catalog 
     return () => window.clearTimeout(timer);
   }, [notice]);
   const selecting = Boolean(selection?.size);
+  // Shift + clic selecciona todo lo que hay entre la última tarjeta marcada y esta (como en el Finder).
+  const anchor = useRef<string | null>(null);
+  const toggle = (id: string, shift?: boolean) => {
+    const from = anchor.current ? videos.findIndex((video) => video.id === anchor.current) : -1;
+    const to = videos.findIndex((video) => video.id === id);
+    if (shift && onSelectRange && from >= 0 && to >= 0 && from !== to) {
+      const [start, end] = from < to ? [from, to] : [to, from];
+      onSelectRange(videos.slice(start, end + 1).map((video) => video.id));
+    } else onToggleSelect?.(id);
+    anchor.current = id;
+  };
   // El menú guarda su fuente al abrirse; se busca la versión actual por si los datos ya cambiaron.
   const menuVideo = menu && (videos.find((video) => video.id === menu.video.id) ?? menu.video);
   return <>
-    <div className="lv-mosaic">{quickNote && onChanged && <QuickNote onCreated={onChanged} />}{videos.map((video) => <MosaicCard key={video.id} video={video} onOpen={() => onOpen(video.id)} selected={selection?.has(video.id)} selecting={selecting} onToggleSelect={onToggleSelect && (() => onToggleSelect(video.id))} onMenu={onChanged && ((x, y) => setMenu({ video, x, y }))} saver={saver} onVibe={onVibe} onCoverChanged={onChanged && (() => void onChanged())} />)}</div>
+    <div className="lv-mosaic">{quickNote && onChanged && <QuickNote onCreated={onChanged} />}{videos.map((video) => <MosaicCard key={video.id} video={video} onOpen={() => onOpen(video.id)} selected={selection?.has(video.id)} selecting={selecting} onToggleSelect={onToggleSelect && ((shift?: boolean) => toggle(video.id, shift))} onMenu={onChanged && ((x, y) => setMenu({ video, x, y }))} saver={saver} onVibe={onVibe} onCoverChanged={onChanged && (() => void onChanged())} />)}</div>
     {menu && menuVideo && onChanged && <TileMenu key={menu.video.id} menu={{ ...menu, video: menuVideo }} catalog={catalog} spaces={spaces} onClose={closeMenu} onChanged={onChanged} onOpen={onOpen} onVibe={onVibe} onNotice={(text, undoId) => setNotice({ text, undoId })} />}
     {notice && <div className="lv-toast lv-grid-toast" role="status">{notice.text}{notice.undoId && <button onClick={() => { const id = notice.undoId!; setNotice(null); void readJson(`/api/videos/${id}`, { method: "PATCH", body: JSON.stringify({ action: "unarchive" }) }).then(() => onChanged?.()); }}>Deshacer</button>}</div>}
   </>;

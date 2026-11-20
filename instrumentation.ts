@@ -7,6 +7,8 @@ export async function register() {
   // Bot de Telegram propio, si está configurado.
   const { startTelegram } = await import("./lib/telegram");
   startTelegram();
+  const { scheduleWatchedFolders } = await import("./lib/watch-folders");
+  scheduleWatchedFolders();
   const { startMobileHttps } = await import("./lib/mobile-https");
   startMobileHttps();
   if (process.env.LUMINA_DAILY_BACKUP !== "0") {

@@ -2959,3 +2959,57 @@ html[data-theme="dark"] .app-rail .rail-theme:hover { background: rgba(255,255,2
 .lv-browser-regen { margin-left: auto; width: 24px; height: 22px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #8d887f; cursor: pointer; }
 .lv-browser-regen:hover { background: rgba(0,0,0,.06); color: #2b2723; }
 .lv-browser-regen.error { color: #c2410c; }
+
+/* Selección como mymind: borde naranja y franja «Seleccionada ✓» arriba */
+.lv-tile.selected .lv-tile-art, .lv-tile.selected .lv-tile-quote, .lv-tile.selected .lv-tile-title, .lv-tile.selected .lv-tile-quote-card, .lv-tile.selected .lv-tile-palette { box-shadow: 0 0 0 2px var(--accent); }
+.lv-tile-selected-bar { position: absolute; z-index: 4; top: 0; left: 0; right: 0; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 10px 10px 0 0; background: var(--accent); color: #fff; font-size: 11.5px; font-weight: 600; pointer-events: none; }
+.lv-tile-selected-bar i { position: absolute; right: 7px; top: 4px; width: 16px; height: 16px; display: grid; place-items: center; border-radius: 50%; background: rgba(255,255,255,.3); }
+.lv-tile.selected .lv-tile-kind, .lv-tile.selected .lv-tile-hover { visibility: hidden; }
+
+.lv-selection-bar { position: fixed; z-index: 80; top: 12px; left: 50%; transform: translateX(-50%); width: min(920px, calc(100vw - 120px)); height: 50px; padding: 0 10px 0 20px; display: flex; align-items: center; gap: 16px; border-radius: 12px; background: rgba(255,255,255,.96); box-shadow: 0 10px 34px rgba(41,37,31,.16), 0 0 0 1px rgba(0,0,0,.04); backdrop-filter: blur(14px); font-size: 13px; color: #2b2723; animation: lv-sel-in .16s ease-out; }
+@keyframes lv-sel-in { from { opacity: 0; transform: translate(-50%, -8px); } }
+.lv-selection-count { white-space: nowrap; color: #6d655d; }
+.lv-selection-count b { color: var(--accent); font-weight: 600; }
+.lv-selection-actions { flex: 1; display: flex; justify-content: center; align-items: center; gap: 6px; }
+.lv-selection-bar button, .lv-selection-bar a { height: 32px; padding: 0 10px; display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 8px; background: none; color: #2b2723; font: 500 13px/1 inherit; text-decoration: none; cursor: pointer; white-space: nowrap; }
+.lv-selection-bar button:hover:not(:disabled), .lv-selection-bar a:hover { background: #f2eee8; }
+.lv-selection-bar button:disabled { opacity: .5; cursor: progress; }
+.lv-selection-trash { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: #c8202f; color: #fff; }
+.lv-selection-cancel { margin-left: auto; color: #8d887f !important; font-size: 11px !important; font-weight: 600 !important; letter-spacing: .08em; text-transform: uppercase; }
+.lv-selection-anchor { position: relative; }
+.lv-selection-menu { position: absolute; top: 40px; left: 0; width: 260px; padding: 6px; border-radius: 12px; background: #fff; box-shadow: 0 14px 40px rgba(0,0,0,.18), 0 0 0 1px rgba(0,0,0,.05); }
+.lv-selection-menu.compact { width: 230px; left: auto; right: 0; }
+.lv-selection-menu input { width: 100%; height: 32px; margin-bottom: 4px; padding: 0 10px; border: 1px solid #e5e0d8; border-radius: 8px; font: inherit; font-size: 12.5px; outline: none; }
+.lv-selection-menu > div { max-height: 300px; overflow-y: auto; display: grid; }
+.lv-selection-menu button, .lv-selection-menu a { width: 100%; justify-content: flex-start; height: 30px; font-size: 12.5px; }
+.lv-selection-menu i { width: 8px; height: 8px; flex: none; border-radius: 50%; }
+.lv-selection-menu .new { color: var(--accent); }
+.lv-selection-menu .danger { color: #c8202f; }
+.lv-selection-menu small { padding: 8px 10px; color: #a39a90; }
+:root[data-theme="dark"] .lv-selection-bar, :root[data-theme="dark"] .lv-selection-menu { background: rgba(32,30,27,.97); color: #ece7df; }
+:root[data-theme="dark"] .lv-selection-bar button, :root[data-theme="dark"] .lv-selection-bar a { color: #ece7df; }
+:root[data-theme="dark"] .lv-selection-bar button:hover:not(:disabled), :root[data-theme="dark"] .lv-selection-bar a:hover { background: rgba(255,255,255,.08); }
+
+/* Espacio compartido (página pública de solo lectura) */
+.share-page { min-height: 100vh; padding: 48px 24px 64px; background: #f6f4f0; color: #2b2723; font-family: "DM Sans", -apple-system, sans-serif; }
+.share-head { max-width: 1100px; margin: 0 auto 28px; }
+.share-brand { display: inline-flex; align-items: center; gap: 8px; color: #8d887f; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.share-brand i { width: 10px; height: 10px; border-radius: 50%; }
+.share-head h1 { margin: 10px 0 4px; font-size: clamp(28px, 5vw, 44px); font-weight: 650; letter-spacing: -.02em; }
+.share-head p { margin: 0; color: #8d887f; font-size: 14px; }
+.share-grid { max-width: 1100px; margin: 0 auto; columns: 4 240px; column-gap: 16px; }
+.share-card { break-inside: avoid; margin-bottom: 16px; display: block; overflow: hidden; border-radius: 12px; background: #fff; color: inherit; text-decoration: none; box-shadow: 0 1px 3px rgba(0,0,0,.06); transition: transform .15s, box-shadow .15s; }
+a.share-card:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(0,0,0,.1); }
+.share-card img { display: block; width: 100%; height: auto; background: #ebe8e2; }
+.share-copy { padding: 12px 14px 14px; }
+.share-copy small { color: #e75e3a; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.share-copy strong { display: block; margin-top: 4px; font-size: 14.5px; line-height: 1.3; }
+.share-copy p { margin: 6px 0 0; color: #6d655d; font-size: 12.5px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.share-foot { margin-top: 40px; text-align: center; color: #a39a90; font-size: 12px; }
+
+.space-tool.share { width: min(520px, calc(100vw - 32px)); }
+.space-tool.share header button { margin-left: auto; border: 0; background: none; cursor: pointer; color: inherit; }
+.share-body { padding: 4px 18px 18px; display: grid; gap: 12px; }
+.share-link { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; border: 1px solid #e5e0d8; border-radius: 10px; background: #fff; }
+.share-link input { flex: 1; min-width: 0; border: 0; outline: none; background: none; font: inherit; font-size: 12.5px; color: inherit; }
+.share-link button { height: 28px; padding: 0 10px; display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 7px; background: #2b2723; color: #fff; font-size: 12px; cursor: pointer; }

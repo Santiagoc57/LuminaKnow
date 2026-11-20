@@ -502,6 +502,7 @@ function SettingsModal({ bootstrap, onClose, onSaved }: { bootstrap: Bootstrap; 
           <small className="extension-install-help">Firefox: abre <code>about:debugging</code> → Este Firefox → Cargar complemento temporal. Chrome: descomprime el ZIP y usa <code>chrome://extensions</code> → Cargar descomprimida.</small>
         </div>
         <AppSection />
+        <WatchFoldersSection />
         <ICloudSection />
         <MobileSection />
         <TelegramSection />
@@ -653,6 +654,33 @@ function AppSection() {
       </ol>
       <small className="settings-help">Usa la biblioteca de este Mac (no es una copia), así que este Mac tiene que estar encendido y en la misma red. También puedes abrir <code>{`http://${state.addresses[0]}`}</code> en cualquier navegador.{state.addresses.length > 1 ? ` Otras direcciones de este Mac: ${state.addresses.slice(1).join(", ")}.` : ""}</small>
     </div> : null}
+    {error && <p className="lv-error">{error}</p>}
+  </div>;
+}
+
+// Carpetas vigiladas: lo nuevo que caiga ahí (PDF e imágenes) entra solo.
+type WatchStatus = { folders: Array<{ path: string; since: string }>; suggested: Array<{ label: string; path: string }>; recent: Array<{ name: string; at: string; folder: string }>; lastError: string };
+function WatchFoldersSection() {
+  const [state, setState] = useState<WatchStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => { void jsonRequest<WatchStatus>("/api/settings/watch-folders").then(setState).catch(() => setState(null)); }, []);
+  const send = async (body: { action: "add" | "remove" | "choose"; path?: string }) => {
+    setBusy(true); setError("");
+    try { setState(await jsonRequest<WatchStatus>("/api/settings/watch-folders", { method: "POST", body: JSON.stringify(body) })); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "No se pudo cambiar."); }
+    finally { setBusy(false); }
+  };
+  const watched = new Set(state?.folders.map((folder) => folder.path) ?? []);
+  const custom = (state?.folders ?? []).filter((folder) => !state?.suggested.some((item) => item.path === folder.path));
+  return <div className="settings-section">
+    <h3>Carpetas vigiladas</h3>
+    <p className="settings-help">Todo PDF o imagen <b>nuevo</b> que caiga en estas carpetas entra solo a LUMINA, con su resumen y etiquetas. Lo que ya estaba ahí no se toca.</p>
+    {state?.suggested.map((item) => <label key={item.path} className="settings-check"><input type="checkbox" disabled={busy} checked={watched.has(item.path)} onChange={(event) => void send({ action: event.target.checked ? "add" : "remove", path: item.path })} /> {item.label}</label>)}
+    {custom.map((folder) => <label key={folder.path} className="settings-check"><input type="checkbox" disabled={busy} checked onChange={() => void send({ action: "remove", path: folder.path })} /> {folder.path.split("/").pop()} <small className="settings-help">{folder.path}</small></label>)}
+    <button className="secondary-button" disabled={busy} onClick={() => void send({ action: "choose" })}><Plus size={14} /> Elegir otra carpeta…</button>
+    {state?.recent.length ? <small className="settings-help">Últimos: {state.recent.slice(0, 4).map((item) => item.name).join(" · ")}</small> : null}
+    {state?.lastError && <p className="lv-error">{state.lastError}</p>}
     {error && <p className="lv-error">{error}</p>}
   </div>;
 }

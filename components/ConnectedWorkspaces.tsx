@@ -1,6 +1,6 @@
 "use client";
 
-import { SpaceDocumentModal, TimelineModal } from "./SpaceTools";
+import { ShareSpaceModal, SpaceDocumentModal, TimelineModal } from "./SpaceTools";
 import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -49,11 +49,14 @@ import {
   Square,
   CalendarRange,
   FileText,
+  Hash,
+  Circle,
 } from "lucide-react";
 import type { AppVideo, AvailableModel, ChatScopeType, ChatSourceSelection, GraphEdgeData, GraphNodeData, LibraryCollection, LibraryTag, SmartSpace } from "@/lib/types";
 import { formatTimestamp, titleCaseTag } from "@/lib/utils";
 import { matchesLibraryQuery, parseLibraryQuery } from "@/lib/library-query";
 import { quotedText } from "@/lib/note-text";
+import { playSound } from "@/lib/sounds";
 import { KnowledgeGraphCanvas } from "./KnowledgeGraphCanvas";
 import { UnifiedChatWorkspace } from "./UnifiedChat";
 import { MosaicGrid, ReaderSplit, SaveSpaceModal, ShelfRow, sourceArtwork, spaceVideos, useDictation, type BoardSaver } from "./DiscoverViews";
@@ -671,6 +674,7 @@ export function KnowledgeHome({ onClearSpace, scopeActive, profileId, videos, co
   const loadSentinelRef = useRef<HTMLDivElement>(null);
   const deferredQuery = useDeferredValue(query);
   const [docSpace, setDocSpace] = useState<{ id: string; name: string } | null>(null);
+  const [shareSpace, setShareSpace] = useState<{ id: string; name: string } | null>(null);
   const [timeline, setTimeline] = useState<{ title: string; videos: AppVideo[] } | null>(null);
   // Momentos dentro de los videos que hablan de lo que buscas (con el minuto exacto).
   const [moments, setMoments] = useState<Array<{ videoId: string; title: string; sourceType: string; thumbnailUrl: string; startSeconds: number; snippet: string; link: string }>>([]);
@@ -1038,6 +1042,7 @@ export function KnowledgeHome({ onClearSpace, scopeActive, profileId, videos, co
             <button role="menuitem" onClick={() => { setFolderMenuId(null); void editFolder(space, "name"); }}><Pencil size={14} /> Cambiar nombre</button>
             <button role="menuitem" onClick={() => { setFolderMenuId(null); void editFolder(space, "query"); }}><Sparkles size={14} /> {space.query ? "Cambiar la regla" : "Añadir una regla"}</button>
             <button role="menuitem" onClick={() => { setFolderMenuId(null); setDocSpace({ id: space.id, name: space.name }); }}><FileText size={14} /> Crear documento</button>
+            <button role="menuitem" onClick={() => { setFolderMenuId(null); setShareSpace({ id: space.id, name: space.name }); }}><Link2 size={14} /> Compartir enlace</button>
             <button role="menuitem" onClick={() => { setFolderMenuId(null); setTimeline({ title: space.name, videos: spaceVideos(space, videos, tags) }); }}><CalendarRange size={14} /> Línea de tiempo</button>
             <button role="menuitem" className="danger" onClick={() => { setFolderMenuId(null); onDeleteSpace?.(space.id); }}>Eliminar espacio</button>
           </div></>}
@@ -1062,7 +1067,7 @@ export function KnowledgeHome({ onClearSpace, scopeActive, profileId, videos, co
         {vibe ? <div className="lv-space-heading lv-vibe-heading">{vibe.artwork && <img src={vibe.artwork} alt="" referrerPolicy="no-referrer" />}<div><h1>Misma vibra</h1><small>Con un aspecto parecido a: {vibe.title}</small></div><button onClick={onClearVibe} title="Salir de Misma vibra" aria-label="Salir de Misma vibra"><X size={15} /></button></div> : null}
         {boardsOpen && !vibe && !activeSpace ? <BoardsGrid boards={topBoards} collections={collections} videos={videos} onOpen={(id) => { setBoardsOpen(false); if (onOpenSpace) onOpenSpace(id); else setCollectionFilter(id); }} /> : <>
         {vibe && filteredVideos.length <= 1 && <p className="lv-vibe-empty">Todavía no encuentro nada con un aspecto parecido. Mientras más imágenes guardes, mejor funcionará.</p>}
-        {shownView === "reader" ? <ReaderSplit videos={filteredVideos} catalog={tags} collections={collections} spaces={spaces} onSearch={onSearchQuery} onVibe={onVibe} onChanged={onRefresh} onOpenFull={onOpenVideo} onAsk={(id) => onAskSource?.(id)} /> : shownView === "mosaic" ? <div className={`lv-size-${cardSize}`}><MosaicGrid saver={boardSaver} videos={filteredVideos.slice(0, visibleCount)} onOpen={(id) => onPreview ? onPreview(id, filteredVideos.map((video) => video.id)) : onOpenVideo(id)} selection={selection} onToggleSelect={(id) => setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])} catalog={tags} spaces={spaces} onChanged={onRefresh} onVibe={onVibe} quickNote={!vibe && !activeSpace && !deferredQuery.trim()} /></div> : shownView === "cards" ? <>
+        {shownView === "reader" ? <ReaderSplit videos={filteredVideos} catalog={tags} collections={collections} spaces={spaces} onSearch={onSearchQuery} onVibe={onVibe} onChanged={onRefresh} onOpenFull={onOpenVideo} onAsk={(id) => onAskSource?.(id)} /> : shownView === "mosaic" ? <div className={`lv-size-${cardSize}`}><MosaicGrid saver={boardSaver} videos={filteredVideos.slice(0, visibleCount)} onOpen={(id) => onPreview ? onPreview(id, filteredVideos.map((video) => video.id)) : onOpenVideo(id)} selection={selection} onToggleSelect={(id) => setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])} onSelectRange={(ids) => setSelectedIds((current) => [...new Set([...current, ...ids])])} catalog={tags} spaces={spaces} onChanged={onRefresh} onVibe={onVibe} quickNote={!vibe && !activeSpace && !deferredQuery.trim()} /></div> : shownView === "cards" ? <>
           <section className="home-date-group home-source-section"><header><h2>Videos</h2><span>{videoSources.length}</span></header><div className="home-video-cards"><button className="home-add-tile" onClick={onAdd}><Plus size={23} /><strong>Agregar fuente</strong><small>YouTube, X, Reddit, GitHub o web</small></button>{renderedVideoSources.map(renderSourceCard)}</div></section>
           {renderedNoteSources.length > 0 && <section className="home-date-group home-source-section"><header><h2>Notas</h2><span>{noteSources.length}</span></header><div className="home-video-cards">{renderedNoteSources.map(renderSourceCard)}</div></section>}
           {renderedPdfSources.length > 0 && <section className="home-date-group home-source-section"><header><h2>PDF</h2><span>{pdfSources.length}</span></header><div className="home-video-cards">{renderedPdfSources.map(renderSourceCard)}</div></section>}
@@ -1077,7 +1082,18 @@ export function KnowledgeHome({ onClearSpace, scopeActive, profileId, videos, co
         </>}
       </div>}
     </div>
-    {selectedIds.length > 0 && mode === "overview" && <aside className="bulk-action-bar"><strong>{selectedIds.length} {selectedIds.length === 1 ? "seleccionada" : "seleccionadas"}</strong><label><Folder size={14} /><select value={bulkFolderId} onChange={(event) => setBulkFolderId(event.target.value)}><option value="">Espacio de destino…</option>{collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select><button disabled={!bulkFolderId || bulkBusy} onClick={() => void bulkAction("add_collection", { collectionId: bulkFolderId })}>Añadir</button>{collectionFilter && <button disabled={!bulkFolderId || bulkFolderId === collectionFilter || bulkBusy} onClick={() => void bulkAction("move_collection", { collectionId: bulkFolderId, fromCollectionId: collectionFilter })}>Mover</button>}</label><label><Tag size={14} /><select value={bulkTagId} onChange={(event) => setBulkTagId(event.target.value)}><option value="">Etiqueta…</option>{tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}</select><button disabled={!bulkTagId || bulkBusy} onClick={() => void bulkAction("add_tags", { tagIds: [bulkTagId] })}>Añadir</button><button disabled={!bulkTagId || bulkBusy} onClick={() => void bulkAction("remove_tags", { tagIds: [bulkTagId] })}>Quitar</button></label><label><Layers size={14} /><select aria-label="Espacio de destino" value={bulkSpaceId} onChange={(event) => setBulkSpaceId(event.target.value)}><option value="">Espacio…</option>{spaces.map((space) => <option key={space.id} value={space.id}>{space.name}</option>)}</select><button disabled={!bulkSpaceId || bulkBusy} onClick={() => void bulkAction("add_space", { spaceId: bulkSpaceId })}>Añadir</button><button disabled={bulkBusy} onClick={() => void addSelectionToNewSpace()} title="Crear un espacio con esta selección">Nuevo</button></label><button onClick={() => setTaggingOpen(true)} disabled={bulkBusy}><WandSparkles size={15} /> IA por lote</button><button onClick={() => void bulkAction("process")} disabled={bulkBusy}><RefreshCw size={15} /> Procesar</button><a href={`/api/export?format=csv&videoIds=${selectedIds.join(",")}`}><Download size={15} /> CSV</a><a href={`/api/export?format=pdf&videoIds=${selectedIds.join(",")}`}><Download size={15} /> PDF</a><a href={`/api/export?format=markdown&videoIds=${selectedIds.join(",")}`}><Download size={15} /> MD</a><a href={`/api/export?format=json&videoIds=${selectedIds.join(",")}`}><Download size={15} /> JSON</a><button onClick={() => void bulkAction("archive")} disabled={bulkBusy} title="Archivar (se puede restaurar)"><Archive size={15} /> Archivar</button><button className="danger" onClick={() => void bulkAction("delete")} disabled={bulkBusy} title="Eliminar definitivamente" aria-label="Eliminar definitivamente"><Trash2 size={15} /></button><button className="close-selection" onClick={() => setSelectedIds([])}><X size={15} /></button>{bulkError && <span className="bulk-error">{bulkError}</span>}</aside>}
+    {selectedIds.length > 0 && mode === "overview" && <SelectionBar count={selectedIds.length} ids={selectedIds} tags={tags} spaces={spaces} collections={collections} busy={bulkBusy} error={bulkError}
+      onTag={(tagId) => void bulkAction("add_tags", { tagIds: [tagId] })}
+      onSpace={(spaceId) => void bulkAction("add_space", { spaceId })}
+      onCollection={(collectionId) => void bulkAction("add_collection", { collectionId })}
+      onNewSpace={() => void addSelectionToNewSpace()}
+      onArchive={() => { playSound("remove"); void bulkAction("archive"); }}
+      onDelete={() => void bulkAction("delete")}
+      onAi={() => setTaggingOpen(true)}
+      onProcess={() => void bulkAction("process")}
+      onSelectAll={() => setSelectedIds(filteredVideos.map((video) => video.id))}
+      onCancel={() => setSelectedIds([])} />}
+    {shareSpace && <ShareSpaceModal spaceId={shareSpace.id} spaceName={shareSpace.name} onClose={() => setShareSpace(null)} />}
     {docSpace && <SpaceDocumentModal spaceId={docSpace.id} spaceName={docSpace.name} onClose={() => setDocSpace(null)} onSaved={() => void onRefresh()} />}
     {timeline && <TimelineModal title={timeline.title} videos={timeline.videos} onClose={() => setTimeline(null)} onOpen={(id) => { setTimeline(null); if (onPreview) onPreview(id); else onOpenVideo(id); }} />}
     {taggingOpen && <BulkTaggingModal videoIds={selectedIds} videos={videos} tags={tags} models={models} onClose={() => setTaggingOpen(false)} onDone={onRefresh} />}
@@ -1315,4 +1331,61 @@ export function GraphWorkspace({ onOpenVideo, focusVideoId, collections = [], ta
       <div className="graph-stage">{loading ? <div className="graph-loading"><LoaderCircle className="spin" size={22} /></div> : <KnowledgeGraphCanvas nodes={visibleGraph.nodes} edges={visibleGraph.edges} selectedId={selected?.id || null} search={search} onSelect={setSelected} nodeSpacing={nodeSpacing} linkDistance={linkDistance} paused={locked} fitRequest={fitRequest} showLabels={!focusVideoId} calm />}{details}</div>
     </section>
   </main>;
+}
+
+// Barra de selección como la de mymind: arriba, discreta y con lo esencial. Lo demás, en «Más».
+function SelectionBar({ count, ids, tags, spaces, collections, busy, error, onTag, onSpace, onCollection, onNewSpace, onArchive, onDelete, onAi, onProcess, onSelectAll, onCancel }: {
+  count: number; ids: string[]; tags: LibraryTag[]; spaces: SmartSpace[]; collections: Collection[]; busy: boolean; error: string;
+  onTag: (id: string) => void; onSpace: (id: string) => void; onCollection: (id: string) => void; onNewSpace: () => void;
+  onArchive: () => void; onDelete: () => void; onAi: () => void; onProcess: () => void; onSelectAll: () => void; onCancel: () => void;
+}) {
+  const [open, setOpen] = useState<"tags" | "space" | "more" | null>(null);
+  const [filter, setFilter] = useState("");
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => { if (event.key === "Escape") { if (open) setOpen(null); else onCancel(); } };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [open, onCancel]);
+  const fold = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase();
+  const toggle = (menu: "tags" | "space" | "more") => { setFilter(""); setOpen((current) => current === menu ? null : menu); };
+  const pick = (action: () => void) => { setOpen(null); action(); };
+  const shownTags = tags.filter((tag) => !filter || fold(tag.name).includes(fold(filter))).slice(0, 40);
+  const shownSpaces = spaces.filter((space) => !filter || fold(space.name).includes(fold(filter)));
+  const shownCollections = collections.filter((collection) => !spaces.some((space) => space.id === collection.id || fold(space.name) === fold(collection.name)) && (!filter || fold(collection.name).includes(fold(filter))));
+  return <div className="lv-selection-bar" role="toolbar" aria-label="Acciones con la selección">
+    <span className="lv-selection-count">Tienes <b>{count} {count === 1 ? "tarjeta seleccionada" : "tarjetas seleccionadas"}</b>.</span>
+    <div className="lv-selection-actions">
+      <div className="lv-selection-anchor">
+        <button disabled={busy} onClick={() => toggle("tags")} aria-expanded={open === "tags"}><Hash size={15} /> Añadir etiquetas</button>
+        {open === "tags" && <div className="lv-selection-menu">
+          <input autoFocus placeholder="Buscar etiqueta…" value={filter} onChange={(event) => setFilter(event.target.value)} />
+          <div>{shownTags.map((tag) => <button key={tag.id} onClick={() => pick(() => onTag(tag.id))}><i style={{ background: tag.color }} />{tag.name}</button>)}{!shownTags.length && <small>Sin resultados</small>}</div>
+        </div>}
+      </div>
+      <div className="lv-selection-anchor">
+        <button disabled={busy} onClick={() => toggle("space")} aria-expanded={open === "space"}><Circle size={15} /> Añadir a espacio</button>
+        {open === "space" && <div className="lv-selection-menu">
+          <input autoFocus placeholder="Buscar espacio…" value={filter} onChange={(event) => setFilter(event.target.value)} />
+          <div>
+            <button className="new" onClick={() => pick(onNewSpace)}><Plus size={13} /> Nuevo espacio con la selección</button>
+            {shownSpaces.map((space) => <button key={space.id} onClick={() => pick(() => onSpace(space.id))}><i style={{ background: space.color || "#c9c2b8" }} />{space.name}</button>)}
+            {shownCollections.map((collection) => <button key={collection.id} onClick={() => pick(() => onCollection(collection.id))}><i style={{ background: "#c9c2b8" }} />{collection.name}</button>)}
+          </div>
+        </div>}
+      </div>
+      <button className="danger" disabled={busy} onClick={onArchive} title="Se pueden restaurar desde Archivadas"><span className="lv-selection-trash"><Trash2 size={12} /></span> Archivar tarjetas</button>
+      <div className="lv-selection-anchor">
+        <button disabled={busy} onClick={() => toggle("more")} aria-expanded={open === "more"} aria-label="Más acciones"><MoreHorizontal size={16} /></button>
+        {open === "more" && <div className="lv-selection-menu compact"><div>
+          <button onClick={() => pick(onSelectAll)}><CheckSquare size={14} /> Seleccionar todo</button>
+          <button onClick={() => pick(onAi)}><WandSparkles size={14} /> Etiquetar con IA</button>
+          <button onClick={() => pick(onProcess)}><RefreshCw size={14} /> Volver a analizar</button>
+          {(["markdown", "pdf", "csv", "json"] as const).map((format) => <a key={format} href={`/api/export?format=${format}&videoIds=${ids.join(",")}`} onClick={() => setOpen(null)}><Download size={14} /> Exportar {format === "markdown" ? "Markdown" : format.toUpperCase()}</a>)}
+          <button className="danger" onClick={() => pick(onDelete)}><Trash2 size={14} /> Eliminar definitivamente</button>
+        </div></div>}
+      </div>
+    </div>
+    {error && <span className="bulk-error">{error}</span>}
+    <button className="lv-selection-cancel" onClick={onCancel}>Cancelar</button>
+  </div>;
 }

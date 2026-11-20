@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Copy, Download, FileText, LoaderCircle, Save, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Copy, Download, FileText, Link2, LoaderCircle, Save, X } from "lucide-react";
 import type { AppVideo } from "@/lib/types";
 
 // Herramientas para producir con lo guardado: documento con citas a partir de un espacio, y línea de tiempo de un tema.
@@ -114,6 +114,34 @@ export function TimelineModal({ title, videos, onOpen, onClose }: { title: strin
           <span><strong>{video.title}</strong><small>{video.summary?.cardSummary || video.summary?.gist || video.channel}</small></span>
         </button></li>)}</ol>
       </section>)}{!dated.length && <p className="space-tool-hint">No hay nada con fecha en esta selección.</p>}</div>
+    </div>
+  </div>;
+}
+
+// Compartir un espacio con un enlace de solo lectura (sin notas, subrayados ni chats).
+export function ShareSpaceModal({ spaceId, spaceName, onClose }: { spaceId: string; spaceName: string; onClose: () => void }) {
+  const [state, setState] = useState<{ enabled: boolean; url: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const call = async (init?: RequestInit) => {
+    const response = await fetch(`/api/spaces/${spaceId}/share`, { headers: { "content-type": "application/json" }, ...init });
+    if (response.ok) setState(await response.json());
+  };
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/spaces/${spaceId}/share`).then((response) => response.ok ? response.json() : null).then((value) => { if (alive && value) setState(value); }).catch(() => undefined);
+    return () => { alive = false; };
+  }, [spaceId]);
+  const toggle = async (enabled: boolean) => { setBusy(true); try { await call({ method: "POST", body: JSON.stringify({ enabled }) }); } finally { setBusy(false); } };
+  const copy = async () => { if (!state?.url) return; await navigator.clipboard.writeText(state.url); setCopied(true); window.setTimeout(() => setCopied(false), 1500); };
+  return <div className="lv-modal-backdrop space-tool-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <div className="space-tool share" role="dialog" aria-label={`Compartir ${spaceName}`}>
+      <header><strong>Compartir · {spaceName}</strong><button onClick={onClose} aria-label="Cerrar"><X size={16} /></button></header>
+      <div className="share-body">
+        <label className="settings-check"><input type="checkbox" disabled={busy || !state} checked={Boolean(state?.enabled)} onChange={(event) => void toggle(event.target.checked)} /> Cualquiera con el enlace puede verlo (solo lectura)</label>
+        {state?.enabled && <div className="share-link"><Link2 size={14} /><input readOnly value={state.url} onFocus={(event) => event.target.select()} /><button onClick={() => void copy()}>{copied ? "Copiado" : <><Copy size={13} /> Copiar</>}</button></div>}
+        <p className="settings-help">Se ven los títulos, imágenes, resúmenes y enlaces originales; nunca tus notas, subrayados ni chats. El enlace funciona para quien esté en tu misma red (Wi-Fi de casa u oficina) mientras LUMINA esté encendida. Si lo desactivas, el enlace deja de funcionar; al activarlo otra vez se crea uno nuevo.</p>
+      </div>
     </div>
   </div>;
 }
