@@ -1402,7 +1402,7 @@ export function MosaicCard({ video, onOpen, selected = false, selecting = false,
   onOpen: () => void;
   selected?: boolean;
   selecting?: boolean;
-  onToggleSelect?: (shift?: boolean) => void;
+  onToggleSelect?: (range?: boolean) => void;
   onMenu?: (x: number, y: number) => void;
   saver?: BoardSaver;
   onVibe?: (video: AppVideo) => void;
@@ -1417,14 +1417,15 @@ export function MosaicCard({ video, onOpen, selected = false, selecting = false,
   const text = sourceText(video);
   const isQuote = !artwork && (video.sourceType === "x" || video.sourceType === "reddit") && Boolean(text);
   const accent = sourceAccent(video);
+  const ctrlToggled = useRef(0);
   const press = () => { if (onToggleSelect && selecting) onToggleSelect(); else onOpen(); };
   return <div className={`lv-tile src-${accent.key} ${artwork ? "has-art" : isQuote ? "is-quote" : "is-text"} ${selected ? "selected" : ""}`} aria-pressed={selecting ? selected : undefined}
     {...pressable(press)}
-    onMouseDown={(event) => { if (event.shiftKey) event.preventDefault(); }}
+    onMouseDown={(event) => { if (event.shiftKey || event.metaKey || event.ctrlKey) event.preventDefault(); }}
     draggable={!selecting}
     onDragStart={(event) => dragOut(event, video)}
-    onClick={(event) => { if (onToggleSelect && (event.shiftKey || selecting)) onToggleSelect(event.shiftKey); else onOpen(); }}
-    onContextMenu={(event) => { if (!onMenu) return; event.preventDefault(); onMenu(event.clientX, event.clientY); }}
+    onClick={(event) => { if (Date.now() - ctrlToggled.current < 400) return; const modifier = event.metaKey || event.ctrlKey; if (onToggleSelect && (modifier || selecting)) onToggleSelect(event.shiftKey && selecting); else onOpen(); }}
+    onContextMenu={(event) => { if (event.ctrlKey && onToggleSelect) { event.preventDefault(); ctrlToggled.current = Date.now(); onToggleSelect(false); return; } if (!onMenu) return; event.preventDefault(); onMenu(event.clientX, event.clientY); }}
     onDragOver={(event) => { if (productOf(video) && event.dataTransfer.types.includes("Files")) { event.preventDefault(); event.stopPropagation(); event.currentTarget.classList.add("drop-target"); } }}
     onDragLeave={(event) => event.currentTarget.classList.remove("drop-target")}
     onDrop={(event) => {

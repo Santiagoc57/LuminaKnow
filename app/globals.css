@@ -3013,3 +3013,11 @@ a.share-card:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(0
 .share-link { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; border: 1px solid #e5e0d8; border-radius: 10px; background: #fff; }
 .share-link input { flex: 1; min-width: 0; border: 0; outline: none; background: none; font: inherit; font-size: 12.5px; color: inherit; }
 .share-link button { height: 28px; padding: 0 10px; display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 7px; background: #2b2723; color: #fff; font-size: 12px; cursor: pointer; }
+
+/* Selección: borde y franja ajustados al marco exacto de la tarjeta */
+.lv-tile.selected .lv-tile-art, .lv-tile.selected .lv-tile-quote, .lv-tile.selected .lv-tile-title, .lv-tile.selected .lv-tile-quote-card, .lv-tile.selected .lv-tile-palette { box-shadow: none; outline: 2px solid var(--accent); outline-offset: 0; }
+.lv-tile.selected > :is(.lv-tile-art, .lv-tile-quote, .lv-tile-title, .lv-tile-quote-card, .lv-tile-palette) { border-color: transparent !important; }
+.lv-tile-selected-bar { top: 0; height: 22px; border-radius: 8px 8px 0 0; font-size: 11px; letter-spacing: .01em; }
+.lv-tile-selected-bar i { top: 3px; right: 6px; }
+.lv-selection-bar .relate { color: var(--accent); font-weight: 600; }
+.lv-tile.selected:hover :is(.lv-tile-art, .lv-tile-quote, .lv-tile-title, .lv-tile-quote-card, .lv-tile-palette) { transform: none; }

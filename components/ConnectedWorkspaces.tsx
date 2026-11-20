@@ -596,7 +596,7 @@ function BoardsGrid({ boards, collections, videos, onOpen }: { boards: Collectio
   })}</div>;
 }
 
-export function KnowledgeHome({ onClearSpace, scopeActive, profileId, videos, collections, tags, models, libraryNavigation, initialTagId, initialMode = "overview", spaces = [], activeSpace = null, shelf = [], initialQuery = "", vibe = null, onVibe, onClearVibe, onSearchQuery, onOpenSpace, onDeleteSpace, onSpaceCreated, onPreview, onAskSource, onModeChange, onAdd, onOpenVideo, onOpenConversation, onConversationChanged, onRefresh }: {
+export function KnowledgeHome({ onClearSpace, scopeActive, profileId, videos, collections, tags, models, libraryNavigation, initialTagId, initialMode = "overview", spaces = [], activeSpace = null, shelf = [], initialQuery = "", vibe = null, onVibe, onClearVibe, onSearchQuery, onOpenSpace, onDeleteSpace, onSpaceCreated, onPreview, onAskSource, onRelateSources, onModeChange, onAdd, onOpenVideo, onOpenConversation, onConversationChanged, onRefresh }: {
   profileId: string;
   videos: AppVideo[];
   collections: Collection[];
@@ -620,6 +620,7 @@ export function KnowledgeHome({ onClearSpace, scopeActive, profileId, videos, co
   scopeActive?: boolean;
   onPreview?: (id: string, sequence?: string[]) => void;
   onAskSource?: (id: string) => void;
+  onRelateSources?: (ids: string[]) => void;
   onModeChange?: (mode: "overview" | "ask") => void;
   onAdd: () => void;
   onOpenVideo: (id: string) => void;
@@ -1051,7 +1052,7 @@ export function KnowledgeHome({ onClearSpace, scopeActive, profileId, videos, co
         {folderSuggestion && <span className="lv-folder-suggest"><button onClick={() => void createSuggestedFolder(folderSuggestion.name)} title={`Crear el espacio «${folderSuggestion.name}»: se llena sola con todo lo etiquetado así`}><Sparkles size={13} /> {folderSuggestion.name} <small>{folderSuggestion.count}</small></button><button className="lv-folder-suggest-x" onClick={() => dismissSuggestion(folderSuggestion.name)} title="No sugerir este espacio" aria-label="No sugerir este espacio"><X size={12} /></button></span>}
       </div>}
       </div>
-      <div className="library-selection-head"><button onClick={() => setSelectedIds(selectedIds.length === filteredVideos.length ? [] : filteredVideos.map((video) => video.id))}><CheckSquare size={15} />{selectedIds.length === filteredVideos.length && filteredVideos.length ? "Quitar selección" : "Seleccionar todo"}</button><span className="lv-results-meta"><label className="lv-date-filter"><CalendarDays size={13} /><select aria-label="Fecha" value={dateFilter} onChange={(event) => setDateFilter(event.target.value as typeof dateFilter)}><option value="all">Cualquier fecha</option><option value="today">Hoy</option><option value="week">Últimos 7 días</option><option value="month">Últimos 30 días</option><option value="year">Este año</option></select></label>{shownView === "mosaic" && <span className="lv-card-size" role="radiogroup" aria-label="Tamaño de las tarjetas">{([["l", "Tarjetas grandes", 2], ["m", "Tarjetas medianas", 3], ["s", "Tarjetas pequeñas", 4]] as const).map(([size, label, cells]) => <button key={size} role="radio" aria-checked={cardSize === size} className={cardSize === size ? "active" : ""} title={label} aria-label={label} onClick={() => changeCardSize(size)}><i style={{ gridTemplateColumns: `repeat(${cells}, 1fr)` }}>{Array.from({ length: cells * cells }, (_, index) => <b key={index} />)}</i></button>)}</span>}{(deferredQuery.trim() || activeSpace) && filteredVideos.length > 1 && <button className="lv-timeline-button" onClick={() => setTimeline({ title: activeSpace?.name || deferredQuery.trim(), videos: filteredVideos })} title="Ver estos resultados ordenados en el tiempo"><CalendarRange size={13} /> Línea de tiempo</button>}{filteredVideos.length} resultados{semanticOnly > 0 && <em className="lv-semantic-count" title="Encontrados por significado aunque no contengan esas palabras"> · {semanticOnly} por significado</em>}</span></div>
+      <div className="library-selection-head"><span /><span className="lv-results-meta"><label className="lv-date-filter"><CalendarDays size={13} /><select aria-label="Fecha" value={dateFilter} onChange={(event) => setDateFilter(event.target.value as typeof dateFilter)}><option value="all">Cualquier fecha</option><option value="today">Hoy</option><option value="week">Últimos 7 días</option><option value="month">Últimos 30 días</option><option value="year">Este año</option></select></label>{shownView === "mosaic" && <span className="lv-card-size" role="radiogroup" aria-label="Tamaño de las tarjetas">{([["l", "Tarjetas grandes", 2], ["m", "Tarjetas medianas", 3], ["s", "Tarjetas pequeñas", 4]] as const).map(([size, label, cells]) => <button key={size} role="radio" aria-checked={cardSize === size} className={cardSize === size ? "active" : ""} title={label} aria-label={label} onClick={() => changeCardSize(size)}><i style={{ gridTemplateColumns: `repeat(${cells}, 1fr)` }}>{Array.from({ length: cells * cells }, (_, index) => <b key={index} />)}</i></button>)}</span>}{(deferredQuery.trim() || activeSpace) && filteredVideos.length > 1 && <button className="lv-timeline-button" onClick={() => setTimeline({ title: activeSpace?.name || deferredQuery.trim(), videos: filteredVideos })} title="Ver estos resultados ordenados en el tiempo"><CalendarRange size={13} /> Línea de tiempo</button>}{filteredVideos.length} resultados{semanticOnly > 0 && <em className="lv-semantic-count" title="Encontrados por significado aunque no contengan esas palabras"> · {semanticOnly} por significado</em>}</span></div>
       </div>}
       {dictation.error && <p className="lv-error lv-search-error">{dictation.error}</p>}
       {filtersOpen && <div className="home-filter-row advanced"><label><CalendarDays size={14} /><select value={dateBasis} onChange={(event) => setDateBasis(event.target.value as typeof dateBasis)}><option value="saved">Fecha guardada</option><option value="published">Fecha publicada</option></select></label><label><select value={dateFilter} onChange={(event) => setDateFilter(event.target.value as typeof dateFilter)}><option value="all">Cualquier fecha</option><option value="today">Hoy</option><option value="week">Últimos 7 días</option></select></label><label><Bookmark size={13} /><select aria-label="Fuente" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as typeof sourceFilter)}><option value="all">Todas las fuentes</option><option value="youtube">YouTube</option><option value="x">X</option><option value="reddit">Reddit</option><option value="github">GitHub</option><option value="web">Páginas web</option><option value="image">Imágenes</option><option value="note">Notas</option><option value="pdf">PDF</option></select></label><label><Folder size={14} /><select value={collectionFilter} onChange={(event) => setCollectionFilter(event.target.value)}><option value="">Todos los espacios</option>{collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select></label><label><Tag size={14} /><select value={tagFilter} onChange={(event) => setTagFilter(event.target.value)}><option value="">Todas las etiquetas</option>{tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}</select></label><label><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="">Cualquier estado</option><option value="saved">Solo guardadas</option><option value="queued">En cola</option><option value="extracting">Extrayendo</option><option value="indexing">Indexando</option><option value="summarizing">Resumiendo</option><option value="ready">Listas</option><option value="failed">Con error</option><option value="needs_transcript">Sin transcripción</option></select></label><label><select value={authorFilter} onChange={(event) => setAuthorFilter(event.target.value)}><option value="">Todos los autores</option>{authors.map((author) => <option key={author} value={author}>{author}</option>)}</select></label><label><select value={contentFilter} onChange={(event) => setContentFilter(event.target.value as typeof contentFilter)}><option value="all">Cualquier contenido</option><option value="notes">Con notas</option><option value="summary">Con resumen</option></select></label><label><select value={threadFilter} onChange={(event) => setThreadFilter(event.target.value as typeof threadFilter)}><option value="all">Publicaciones e hilos</option><option value="thread">Solo hilos</option><option value="single">Solo individuales</option></select></label><label><select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)}><option value="recent">Más recientes</option><option value="oldest">Más antiguas</option><option value="title">Por título</option><option value="author">Por autor</option></select></label>{activeFilterCount > 0 && <button className="clear-filters" onClick={clearFilters}><X size={13} /> Limpiar filtros</button>}</div>}
@@ -1082,7 +1083,7 @@ export function KnowledgeHome({ onClearSpace, scopeActive, profileId, videos, co
         </>}
       </div>}
     </div>
-    {selectedIds.length > 0 && mode === "overview" && <SelectionBar count={selectedIds.length} ids={selectedIds} tags={tags} spaces={spaces} collections={collections} busy={bulkBusy} error={bulkError}
+    {selectedIds.length > 0 && mode === "overview" && <SelectionBar count={selectedIds.length} tags={tags} spaces={spaces} collections={collections} busy={bulkBusy} error={bulkError}
       onTag={(tagId) => void bulkAction("add_tags", { tagIds: [tagId] })}
       onSpace={(spaceId) => void bulkAction("add_space", { spaceId })}
       onCollection={(collectionId) => void bulkAction("add_collection", { collectionId })}
@@ -1091,7 +1092,7 @@ export function KnowledgeHome({ onClearSpace, scopeActive, profileId, videos, co
       onDelete={() => void bulkAction("delete")}
       onAi={() => setTaggingOpen(true)}
       onProcess={() => void bulkAction("process")}
-      onSelectAll={() => setSelectedIds(filteredVideos.map((video) => video.id))}
+      onRelate={onRelateSources && selectedIds.length >= 2 ? () => { const ids = selectedIds; setSelectedIds([]); onRelateSources(ids); } : undefined}
       onCancel={() => setSelectedIds([])} />}
     {shareSpace && <ShareSpaceModal spaceId={shareSpace.id} spaceName={shareSpace.name} onClose={() => setShareSpace(null)} />}
     {docSpace && <SpaceDocumentModal spaceId={docSpace.id} spaceName={docSpace.name} onClose={() => setDocSpace(null)} onSaved={() => void onRefresh()} />}
@@ -1334,10 +1335,10 @@ export function GraphWorkspace({ onOpenVideo, focusVideoId, collections = [], ta
 }
 
 // Barra de selección como la de mymind: arriba, discreta y con lo esencial. Lo demás, en «Más».
-function SelectionBar({ count, ids, tags, spaces, collections, busy, error, onTag, onSpace, onCollection, onNewSpace, onArchive, onDelete, onAi, onProcess, onSelectAll, onCancel }: {
-  count: number; ids: string[]; tags: LibraryTag[]; spaces: SmartSpace[]; collections: Collection[]; busy: boolean; error: string;
+function SelectionBar({ count, tags, spaces, collections, busy, error, onTag, onSpace, onCollection, onNewSpace, onArchive, onDelete, onAi, onProcess, onRelate, onCancel }: {
+  count: number; tags: LibraryTag[]; spaces: SmartSpace[]; collections: Collection[]; busy: boolean; error: string;
   onTag: (id: string) => void; onSpace: (id: string) => void; onCollection: (id: string) => void; onNewSpace: () => void;
-  onArchive: () => void; onDelete: () => void; onAi: () => void; onProcess: () => void; onSelectAll: () => void; onCancel: () => void;
+  onArchive: () => void; onDelete: () => void; onAi: () => void; onProcess: () => void; onRelate?: () => void; onCancel: () => void;
 }) {
   const [open, setOpen] = useState<"tags" | "space" | "more" | null>(null);
   const [filter, setFilter] = useState("");
@@ -1373,14 +1374,13 @@ function SelectionBar({ count, ids, tags, spaces, collections, busy, error, onTa
           </div>
         </div>}
       </div>
+      {onRelate && <button className="relate" disabled={busy} onClick={onRelate} title="Abre el chat y le pide a la IA que explique qué conecta lo que elegiste"><Sparkles size={15} /> Relacionar con IA</button>}
       <button className="danger" disabled={busy} onClick={onArchive} title="Se pueden restaurar desde Archivadas"><span className="lv-selection-trash"><Trash2 size={12} /></span> Archivar tarjetas</button>
       <div className="lv-selection-anchor">
         <button disabled={busy} onClick={() => toggle("more")} aria-expanded={open === "more"} aria-label="Más acciones"><MoreHorizontal size={16} /></button>
         {open === "more" && <div className="lv-selection-menu compact"><div>
-          <button onClick={() => pick(onSelectAll)}><CheckSquare size={14} /> Seleccionar todo</button>
           <button onClick={() => pick(onAi)}><WandSparkles size={14} /> Etiquetar con IA</button>
           <button onClick={() => pick(onProcess)}><RefreshCw size={14} /> Volver a analizar</button>
-          {(["markdown", "pdf", "csv", "json"] as const).map((format) => <a key={format} href={`/api/export?format=${format}&videoIds=${ids.join(",")}`} onClick={() => setOpen(null)}><Download size={14} /> Exportar {format === "markdown" ? "Markdown" : format.toUpperCase()}</a>)}
           <button className="danger" onClick={() => pick(onDelete)}><Trash2 size={14} /> Eliminar definitivamente</button>
         </div></div>}
       </div>

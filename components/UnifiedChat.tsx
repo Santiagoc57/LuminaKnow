@@ -175,6 +175,17 @@ export function UnifiedChatWorkspace({ conversationId, videos, collections, tags
     } catch (cause) { setError(cause instanceof Error ? cause.message : "No se pudieron guardar las fuentes."); }
   }
 
+  // Pregunta que llega lista desde otra pantalla (p. ej. «Relacionar con IA» en la selección): se envía sola una vez.
+  const autoAsked = useRef(false);
+  useEffect(() => {
+    if (conversationId || autoAsked.current) return;
+    let pending = "";
+    try { pending = window.sessionStorage.getItem("lumina-new-chat-question") || ""; window.sessionStorage.removeItem("lumina-new-chat-question"); } catch { pending = ""; }
+    if (!pending) return;
+    autoAsked.current = true;
+    window.setTimeout(() => void ask(pending), 0);
+  }); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function ask(value = question) {
     const prompt = value.trim();
     if (!prompt || generatingTurn) return;
