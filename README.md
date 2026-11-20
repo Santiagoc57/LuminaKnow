@@ -5,118 +5,170 @@
 <h1 align="center">LUMINA</h1>
 
 <p align="center">
-  <strong>Tu segunda mente, privada y local.</strong><br />
-  Guarda lo que encuentras en la web y LUMINA lo resume, lo etiqueta y lo conecta. Después puedes preguntarle lo que quieras a tu biblioteca.
+  <strong>Tu segunda mente, privada y en tu propio Mac.</strong><br />
+  Guarda lo que encuentras en internet (videos, tweets, webs, imágenes, PDF) y LUMINA lo resume, lo ordena y te deja preguntarle lo que quieras.
 </p>
 
 <p align="center">
+  <img alt="macOS 13+" src="https://img.shields.io/badge/macOS-13%2B-555" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-black" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-149eca" />
   <img alt="SQLite" src="https://img.shields.io/badge/SQLite-local-003b57" />
-  <img alt="macOS" src="https://img.shields.io/badge/macOS-13%2B-555" />
-  <img alt="Privado" src="https://img.shields.io/badge/datos-100%25%20en%20tu%20Mac-e75e3a" />
+  <img alt="Licencia MIT" src="https://img.shields.io/badge/licencia-MIT-green" />
 </p>
 
 ---
 
-## Qué es
+## ¿De qué va esto? (explicado en un minuto)
 
-LUMINA es un gestor de conocimiento personal en la línea de mymind. Todo vive en tu Mac: tus fuentes, tus notas, tus subrayados y la base de datos. Nada pasa por un servidor ajeno, salvo las llamadas a IA que tú decides hacer.
+¿Te pasa que guardas cosas interesantes (un video, un hilo de X, un artículo, una imagen) y después no las encuentras o no recuerdas qué decían? LUMINA es **una biblioteca personal** para eso.
 
-## Características
+1. **Guardas.** Mientras navegas, haces clic en el botón de LUMINA en tu navegador o en tu celular.
+2. **LUMINA trabaja por ti.** Lee la fuente, escribe un resumen en español, le pone un título claro, la etiqueta por temas y la conecta con cosas parecidas que ya tenías.
+3. **Encuentras y preguntas.** Lo buscas como hablarías («lo de diseño que guardé en septiembre») o le haces preguntas a tu biblioteca: *«¿Qué dicen mis videos sobre productividad?»*. Las respuestas te dicen de dónde salen y, en los videos, el minuto exacto.
 
-### Guardar
-- **Cualquier fuente:** videos de YouTube, publicaciones e hilos de X, Reddit, Facebook, webs, artículos, imágenes, galerías, PDF, audio, notas y paletas de color.
-- **Extensión para Chrome y Firefox:**
-  - Un diálogo centrado con título editable, etiquetas sugeridas (que puedes quitar), espacio sugerido y nota.
-  - Un botón en cada tweet y un icono discreto sobre imágenes, videos y posts.
-  - Captura de la página como portada, como hace mymind.
-- **Celular:** una app instalable (PWA) que aparece en «Compartir», con la biblioteca para leer sin conexión y un chat.
-- **Telegram:** reenvía enlaces a tu bot y llegan a LUMINA.
+Se inspira en apps como **mymind**, con una diferencia importante: **todo vive en tu Mac**. No hay cuenta en la nube ni servidor de otra empresa guardando tus cosas.
 
-### Entender
-- **Resúmenes en español:** con ideas clave, títulos que dicen de qué trata cada cosa y un resumen minuto a minuto de los videos.
-- **Visión local** (Apple Vision): texto dentro de imágenes, objetos y colores, sin enviar nada fuera.
-- **Transcripciones** de videos y audio, descargables en `.txt`.
+## ¿Para quién es?
 
-### Encontrar
-- **Un buscador que entiende lo que escribes:** fechas habladas («en septiembre»), tipos (`tipo:pdf`), colores, objetos, texto dentro de imágenes y momentos dentro de los videos.
-- **Espacios inteligentes:** tableros que se llenan solos con reglas. Cada uno tiene su chat, se puede ver como documento y como línea de tiempo.
-- **«Más como esto»:** muestra imágenes que se ven parecidas.
+- Para quien guarda mucho contenido y quiere **encontrarlo y aprovecharlo** después.
+- Para quien quiere **privacidad**: tus datos no salen de tu computadora.
+- Para quien usa **Mac**. Es lo único necesario; además se puede usar desde el celular y desde otros Mac de tu casa.
 
-### Conversar
-- **Chat con toda tu biblioteca,** con un espacio o con una sola fuente. Las respuestas citan su origen y el segundo exacto en los videos.
-- **Subrayados y recortes con nota,** que se resaltan cuando vuelves a visitar la página.
+## Qué puede hacer
 
-### Ordenar
-- **Limpieza inteligente:** propone qué conservar y qué olvidar, une etiquetas parecidas y mejora los títulos.
-- **«En mente»:** las fuentes que fijas para tenerlas a mano.
-- **Grafo de conocimiento y revisión diaria:** están en el menú del perfil.
+| | |
+|---|---|
+| 📥 **Guardar casi cualquier cosa** | Videos de YouTube, tweets e hilos de X, Reddit, Facebook, webs, artículos, imágenes, galerías, PDF, audios, notas y paletas de color. |
+| 🧩 **Extensión para Chrome y Firefox** | Un botón en cada tweet y un icono discreto sobre imágenes y videos. Al guardar se abre una ventanita para cambiar el título, elegir etiquetas y espacio y escribir una nota. En las webs toma una captura como portada. |
+| 📱 **Desde el celular** | Una app que se instala desde el navegador y aparece en el menú «Compartir». Permite leer tu biblioteca sin conexión y usar el chat. También puedes enviar enlaces por Telegram. |
+| ✨ **Resúmenes con IA** | Ideas clave en español, títulos que explican de qué trata cada cosa y un resumen minuto a minuto de los videos. |
+| 👁️ **Lee imágenes en tu Mac** | Con la visión de Apple reconoce el texto dentro de las fotos, los objetos y los colores, sin enviar nada fuera. |
+| 🔎 **Buscador que entiende** | Fechas habladas («ayer», «en marzo»), tipos (`tipo:pdf`), colores, texto dentro de imágenes y momentos dentro de los videos. |
+| 🗂️ **Espacios inteligentes** | Tableros que se llenan solos según reglas, como «todo lo de diseño web». Cada espacio tiene su chat y se puede ver como documento o como línea de tiempo. |
+| 💬 **Chat con tu biblioteca** | Pregúntale a todo, a un espacio o a una sola fuente. Las respuestas siempre citan de dónde salen. |
+| 🖍️ **Subrayados y recortes** | Subraya frases y añade notas; cuando vuelves a visitar esa web, se ven resaltadas. |
+| 🧹 **Limpieza inteligente** | Te propone qué conservar y qué olvidar, une etiquetas repetidas y mejora los títulos. |
+| 🖥️ **App de Mac** | `LUMINA.app` con su icono en el Dock. Se abre en su propia ventana y, si quieres, arranca sola al encender el Mac. |
+| ☁️ **Varios Mac con iCloud** | Sincroniza tu biblioteca entre tus Mac por iCloud Drive. Si hay un conflicto, nada se pierde: la otra versión se guarda aparte. |
 
-### Como app de Mac
-- **`LUMINA.app` en Aplicaciones:** con su icono en el Dock, se abre en su propia ventana y puede arrancar sola al iniciar sesión.
-- **Sincronización por turnos con iCloud Drive** entre tus Mac. Si hay un conflicto, la otra versión se guarda aparte y no se pierde nada.
+## Cómo funciona por dentro (sin tecnicismos)
 
-## Inicio rápido
-
-Requisitos: macOS 13 o posterior, Node.js 20 o posterior, `yt-dlp` y FFmpeg.
-
-```bash
-npm install
-npm run dev -- --hostname 0.0.0.0
+```
+ Navegador / celular / Telegram
+            │  guardas algo
+            ▼
+   ┌───────────────────────┐
+   │   LUMINA en tu Mac    │  ← un pequeño servidor que solo vive en tu computadora
+   │  • base de datos      │     (los datos quedan en la carpeta data/)
+   │  • visión de Apple    │
+   └──────────┬────────────┘
+              │ solo el texto necesario, cuando pides un resumen o haces una pregunta
+              ▼
+     IA (Gemini u OpenAI, con tu propia clave)
 ```
 
-Abre `http://localhost:3000`. La primera pantalla crea tu perfil con su PIN y te pide la clave de IA (Gemini u OpenAI).
+La IA es lo único externo. Usa **tu propia clave** y solo recibe el texto necesario para resumir o responder. Todo lo demás (guardar, buscar, leer imágenes, ordenar) ocurre en tu Mac.
 
-### Como app
+## Instalación paso a paso
+
+> Si nunca has usado la Terminal, no te preocupes: son unos pocos comandos para copiar y pegar.
+
+**1. Lo que necesitas antes**
+- Un Mac con macOS 13 (Ventura) o posterior.
+- [Node.js](https://nodejs.org) 20 o posterior: descárgalo e instálalo como cualquier programa.
+- [Homebrew](https://brew.sh) y, con él, las herramientas de video: `brew install yt-dlp ffmpeg`
+- Una clave de IA. Sirve la de [Google Gemini](https://aistudio.google.com/apikey), que tiene un plan gratuito, o la de OpenAI.
+
+**2. Descarga LUMINA**
+
+```bash
+git clone https://github.com/Santiagoc57/LuminaKnow.git
+cd LuminaKnow
+npm install
+```
+
+**3. Instálala como app de Mac** (recomendado)
 
 ```bash
 ./scripts/app/install-app.sh
 ```
 
-Esto instala `LUMINA.app` en `/Applications`. Al abrirla, compila el servidor si hace falta, lo arranca y se actualiza sola cuando cambia el código.
+Aparece **LUMINA** en tu carpeta Aplicaciones. Ábrela: la primera vez tarda un poco porque se prepara.
 
-### Extensión del navegador
+*¿Solo quieres probarla?* También puedes arrancarla con `npm run dev` y abrir `http://localhost:3000` en tu navegador.
+
+**4. Primeros pasos dentro de la app**
+1. Crea tu perfil y tu PIN.
+2. Pega tu clave de IA cuando te la pida.
+3. Pulsa **+** para guardar tu primer enlace.
+
+**5. Instala la extensión del navegador** (opcional, pero es lo más cómodo)
 
 ```bash
 npm run extension:build
 ```
 
-- **Chrome:** abre `chrome://extensions`, activa el modo desarrollador y pulsa «Cargar descomprimida». Elige la carpeta `extension/dist/chrome`.
-- **Firefox:** `npm run extension:sign` crea el `.xpi` firmado. Necesita tus claves de AMO en un archivo `.amo-keys` local, que no se versiona.
+- **Chrome:** entra en `chrome://extensions`, activa el *Modo desarrollador* (arriba a la derecha), pulsa **Cargar descomprimida** y elige la carpeta `extension/dist/chrome`.
+- **Firefox:** necesita una versión firmada por Mozilla. Ejecuta `npm run extension:sign`, que pide tus claves de desarrollador de Mozilla en un archivo `.amo-keys`.
 
-## Estructura
+Después, en los ajustes de la extensión, vincúlala con el código que aparece en LUMINA → Ajustes.
 
-```
-app/          Rutas de Next.js (interfaz y API)
-components/   Interfaz en React
-lib/          Lógica: base de datos, IA, búsqueda, espacios, sincronización…
-extension/    Extensión para Chrome y Firefox
-public/m/     App para el celular (PWA)
-scripts/      App de Mac, copias de seguridad, utilidades
-bin/          Ayudantes nativos (Vision, audio)
-tests/        Pruebas
-```
+## Preguntas frecuentes
 
-## Privacidad
+**¿Mis datos se suben a algún lado?**
+No. Se guardan en la carpeta `data/` de tu Mac, y esa carpeta nunca se sube a GitHub. Lo único que sale es el texto que se manda a la IA cuando pides un resumen o haces una pregunta.
 
-- **Lo que nunca se versiona** (está en `.gitignore`): la base de datos (`data/`), las claves (`data/secrets.json`), las copias (`backups/`), las claves de firma (`.amo-keys`) y los paquetes compilados.
-- **Las claves de IA** se guardan solo en tu Mac, con permisos de propietario.
-- **El celular y la extensión** se vinculan con un código propio y hablan con tu Mac por la red de casa.
-- **Copias de seguridad automáticas:** se conservan las siete más recientes. Para restaurar una:
+**¿Cuánto cuesta?**
+LUMINA es gratis. Solo pagas la IA si superas el plan gratuito de tu proveedor. En Ajustes ves cuánto llevas gastado en el mes.
+
+**¿Funciona en Windows o Linux?**
+La biblioteca web sí podría, pero la app, la lectura de imágenes y la sincronización con iCloud están hechas para Mac.
+
+**¿Y si borro algo sin querer?**
+Archivar no borra: puedes restaurarlo. Además LUMINA hace copias de seguridad automáticas y guarda las siete más recientes. Para volver a una copia:
 
 ```bash
 npm run restore -- backups/lumina-FECHA.sqlite
 ```
 
-## Desarrollo
+## Estructura del proyecto (para quien quiera curiosear el código)
+
+```
+app/          Pantallas y API (Next.js)
+components/   Piezas de la interfaz (React)
+lib/          El cerebro: base de datos, IA, búsqueda, espacios, sincronización
+extension/    Extensión para Chrome y Firefox
+public/m/     App para el celular
+scripts/      App de Mac, copias de seguridad y utilidades
+bin/          Ayudantes nativos de macOS (visión, audio)
+tests/        Pruebas automáticas
+```
+
+**Para desarrollar:**
 
 ```bash
 npm test          # pruebas
-npm run lint      # estilo
-npm run build     # compilación de producción
+npm run lint      # revisa el estilo del código
+npm run build     # versión de producción
 ```
+
+## Privacidad y seguridad
+
+Nunca se suben al repositorio (están en `.gitignore`):
+
+- La base de datos y tus archivos (`data/`).
+- Tus claves de IA (`data/secrets.json`).
+- Las copias de seguridad (`backups/`).
+- Las claves de firma de la extensión (`.amo-keys`).
+- Los paquetes compilados.
+
+La extensión y el celular se conectan a tu Mac con un código de vinculación propio y solo dentro de tu red.
+
+## Licencia
+
+[MIT](LICENSE): puedes usarlo, modificarlo y compartirlo libremente.
 
 ---
 
-<p align="center">Hecho para uso personal · Todos los datos se quedan contigo.</p>
+<p align="center">Hecho con cariño para uso personal · Tus ideas se quedan contigo.</p>
