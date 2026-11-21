@@ -137,6 +137,7 @@ function scopedCitations(content: string, evidence: RetrievalRow[]): Citation[] 
       startSeconds: row.startSeconds ?? 0,
       endSeconds: row.endSeconds ?? row.startSeconds ?? 0,
       label: `${row.videoTitle} · ${timeLabel}`,
+      ref: index + 1,
       text: row.text.slice(0, 280),
       videoId: row.videoId,
       videoTitle: row.videoTitle,

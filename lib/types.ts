@@ -42,6 +42,8 @@ export type Citation = {
   sourceKind?: "transcript" | "summary" | "note";
   sourceItemId?: string;
   sourceItemUrl?: string;
+  // Número [S n] con el que la IA citó este fragmento (para dibujar las citas numeradas).
+  ref?: number;
 };
 
 export type SourceItem = {

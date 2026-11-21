@@ -1004,6 +1004,8 @@ html[data-theme="dark"] .share-copy p { color: hsl(30 8% 58%); }
 html[data-theme="dark"] .share-foot { color: hsl(32 9% 78%); }
 html[data-theme="dark"] .share-link { border: 1px solid hsl(37 4% 23%); background: hsl(0 0% 20%); }
 html[data-theme="dark"] .share-link button { background: hsl(30 3% 33%); }
+html[data-theme="dark"] .answer-save { border: 1px solid hsl(37 4% 23%); background: hsl(0 0% 20%); color: hsl(30 8% 58%); }
+html[data-theme="dark"] .answer-save.done { border-color: hsl(135 5% 23%); background: hsl(130 5% 18%); }
 
 /* «ESC para cerrar» va sobre el fondo oscuro del modal: blanco también en modo oscuro. */
 html[data-theme="dark"] .lv-modal-esc { color: rgba(255,255,255,.82); }

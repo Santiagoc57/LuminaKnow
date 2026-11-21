@@ -114,7 +114,11 @@ export function UnifiedChatWorkspace({ conversationId, videos, collections, tags
   const [selection, setSelection] = useState<ChatSourceSelection>(initialSelection || emptySelection());
   const [question, setQuestion] = useState("");
   const [draftTitle, setDraftTitle] = useState(initialTitle);
-  const [modelId, setModelId] = useState<AvailableModel["id"]>(models[0]?.id || "auto");
+  const [modelId, setModelId] = useState<AvailableModel["id"]>(() => {
+    // Si llega un modelo pedido (p. ej. Luna para relacionar fuentes), se queda elegido para seguir la conversación.
+    try { const wanted = !conversationId && typeof window !== "undefined" ? window.sessionStorage.getItem("lumina-new-chat-model") : ""; const found = models.find((item) => item.id === wanted); if (found) return found.id; } catch { /* sin almacenamiento */ }
+    return models[0]?.id || "auto";
+  });
   const [loading, setLoading] = useState(Boolean(conversationId));
   const [generatingTurn, setGeneratingTurn] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -138,8 +142,12 @@ export function UnifiedChatWorkspace({ conversationId, videos, collections, tags
     if (!conversationId) { setDetail(null); setLoading(false); return null; }
     const result = await readJson<ConversationDetail>(`/api/conversations/${conversationId}`);
     setDetail(result); setSelection(result.selection); setLoading(false);
+    // Las preguntas siguientes usan el mismo modelo que la última.
+    const lastModel = [...result.messages].reverse().find((message) => message.role === "user")?.modelId;
+    if (lastModel && models.some((item) => item.id === lastModel)) setModelId(lastModel);
+    try { window.sessionStorage.removeItem("lumina-new-chat-model"); } catch { /* sin almacenamiento */ }
     return result;
-  }, [conversationId]);
+  }, [conversationId, models]);
 
   const generate = useCallback(async (id: string, turnId: string) => {
     if (generatingTurn === turnId) return;
@@ -180,23 +188,29 @@ export function UnifiedChatWorkspace({ conversationId, videos, collections, tags
   useEffect(() => {
     if (conversationId || autoAsked.current) return;
     let pending = "";
-    try { pending = window.sessionStorage.getItem("lumina-new-chat-question") || ""; window.sessionStorage.removeItem("lumina-new-chat-question"); } catch { pending = ""; }
+    let model = "";
+    try {
+      pending = window.sessionStorage.getItem("lumina-new-chat-question") || ""; window.sessionStorage.removeItem("lumina-new-chat-question");
+      model = window.sessionStorage.getItem("lumina-new-chat-model") || ""; window.sessionStorage.removeItem("lumina-new-chat-model");
+    } catch { pending = ""; }
     if (!pending) return;
     autoAsked.current = true;
-    window.setTimeout(() => void ask(pending), 0);
+    const chosen = models.find((item) => item.id === model)?.id;
+    window.setTimeout(() => void ask(pending, chosen), 0);
   }); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function ask(value = question) {
+  async function ask(value = question, modelOverride?: AvailableModel["id"]) {
+    const model = modelOverride || modelId;
     const prompt = value.trim();
     if (!prompt || generatingTurn) return;
     setQuestion(""); setError("");
     try {
       if (!conversationId) {
-        const created = await readJson<{ conversationId: string }>("/api/conversations", { method: "POST", body: JSON.stringify({ question: prompt, title: draftTitle.trim() || undefined, sourceSelection: selection, modelId }) });
+        const created = await readJson<{ conversationId: string }>("/api/conversations", { method: "POST", body: JSON.stringify({ question: prompt, title: draftTitle.trim() || undefined, sourceSelection: selection, modelId: model }) });
         onConversationChanged(); onOpenConversation(created.conversationId);
         return;
       }
-      const created = await readJson<{ turnId: string }>(`/api/conversations/${conversationId}/messages`, { method: "POST", body: JSON.stringify({ question: prompt, modelId }) });
+      const created = await readJson<{ turnId: string }>(`/api/conversations/${conversationId}/messages`, { method: "POST", body: JSON.stringify({ question: prompt, modelId: model }) });
       await loadConversation(); onConversationChanged();
       await generate(conversationId, created.turnId);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "No se pudo guardar la pregunta."); }
@@ -272,7 +286,7 @@ export function UnifiedChatWorkspace({ conversationId, videos, collections, tags
         <div className="unified-chat-messages" ref={scrollRef}>
           {loading && <LoaderCircle className="spin" size={22} />}
           {!loading && !detail?.messages.length && <div className="unified-chat-empty"><span><Sparkles size={25} /></span><h1>{activeIds.length ? "Habla con tus conocimientos" : "Pregunta a toda tu biblioteca"}</h1><p>{activeIds.length ? "Pregunta, compara y encuentra relaciones. Cada respuesta conservará las fuentes exactas utilizadas." : "Busco en todo lo que has guardado y cito cada tarjeta. Si prefieres, elige fuentes con @."}</p>{activeIds.length > 0 && <div><button onClick={() => void ask("Resume las ideas más importantes de estas fuentes")}>Resumir ideas</button><button onClick={() => void ask("¿Qué relaciones existen entre estas fuentes?")}>Encontrar relaciones</button><button onClick={() => void ask("Compara los puntos de vista de estas fuentes")}>Comparar perspectivas</button></div>}{!activeIds.length && <div><button onClick={() => void ask("¿De qué temas he guardado más cosas últimamente?")}>Mis temas recientes</button><button onClick={() => void ask("¿Qué he guardado sobre inteligencia artificial local?")}>IA local</button><button onClick={() => void ask("¿Qué ideas se repiten entre mis fuentes?")}>Ideas que se repiten</button></div>}</div>}
-          {detail?.messages.map((message) => <article key={message.id} className={`unified-message ${message.role}`}><span>{message.role === "assistant" ? <Sparkles size={15} /> : "Tú"}</span><div><p>{message.content}</p>{message.citations.length > 0 && <div className="unified-citations">{message.citations.map((citation, index) => <a key={`${citation.videoId}-${citation.startSeconds}-${index}`} href={citationHref(citation)} target="_blank" rel="noreferrer">{citation.sourceType !== "youtube" ? <ExternalLink size={11} /> : <Play size={11} fill="currentColor" />}<span>{citation.videoTitle || citation.label}</span><small>{citation.sourceKind === "note" ? "Nota" : citation.sourceKind === "summary" ? "Resumen" : citation.sourceType === "web" ? "Sección" : citation.sourceType !== "youtube" ? "Publicación" : formatTimestamp(citation.startSeconds)}</small></a>)}</div>}</div></article>)}
+          {detail?.messages.map((message) => <article key={message.id} className={`unified-message ${message.role}`}><span>{message.role === "assistant" ? <Sparkles size={15} /> : "Tú"}</span><div>{message.role === "assistant" ? <AnswerText content={message.content} citations={message.citations} /> : <p>{message.content}</p>}{message.role === "assistant" && <SaveAnswer message={message} question={detail.messages[detail.messages.indexOf(message) - 1]?.content || ""} />}{message.citations.length > 0 && <div className="unified-citations">{message.citations.map((citation, index) => <a key={`${citation.videoId}-${citation.startSeconds}-${index}`} href={citationHref(citation)} target="_blank" rel="noreferrer"><b className="cite-num">{index + 1}</b>{citation.sourceType !== "youtube" ? <ExternalLink size={11} /> : <Play size={11} fill="currentColor" />}<span>{citation.videoTitle || citation.label}</span><small>{citation.sourceKind === "note" ? "Nota" : citation.sourceKind === "summary" ? "Resumen" : citation.sourceType === "web" ? "Sección" : citation.sourceType !== "youtube" ? "Publicación" : formatTimestamp(citation.startSeconds)}</small></a>)}</div>}</div></article>)}
           {generatingTurn && <article className="unified-message assistant"><span><Sparkles size={15} /></span><div><i className="scope-typing"><b /><b /><b /></i></div></article>}
           {failedTurns.map((turn) => <button key={turn.id} className="chat-retry" onClick={() => conversationId && void generate(conversationId, turn.id)}><RotateCcw size={14} /> Reintentar respuesta</button>)}
         </div>
@@ -281,4 +295,50 @@ export function UnifiedChatWorkspace({ conversationId, videos, collections, tags
       </>}
     </section>
   </main>;
+}
+
+// Respuesta de la IA con formato: párrafos, **negritas** y citas [S n] como números que llevan a su fuente.
+function AnswerText({ content, citations }: { content: string; citations: Citation[] }) {
+  // Respuestas antiguas no guardan el número [S n] de cada cita: se deduce por orden de aparición (así se guardaron).
+  const hasRefs = citations.some((citation) => citation.ref);
+  const order = [...new Set([...content.matchAll(/\[S(\d+)/g)].map((match) => Number(match[1])))];
+  const numberOf = (ref: number) => {
+    const index = hasRefs ? citations.findIndex((citation) => citation.ref === ref) : order.indexOf(ref);
+    return index >= 0 && index < citations.length ? index : null;
+  };
+  const inline = (text: string, key: string) => text.split(/(\*\*[^*]+\*\*|(?:\[S\d+[^\]]*\])+)/g).filter(Boolean).map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) return <strong key={`${key}-${index}`}>{part.slice(2, -2)}</strong>;
+    if (part.startsWith("[S")) {
+      const numbers = [...new Set([...part.matchAll(/\[S(\d+)/g)].map((match) => numberOf(Number(match[1]))).filter((value): value is number => value !== null))];
+      return <span key={`${key}-${index}`} className="cite-group">{numbers.map((number) => <a key={number} className="cite-num" href={citationHref(citations[number])} target="_blank" rel="noreferrer" title={citations[number].videoTitle || citations[number].label}>{number + 1}</a>)}</span>;
+    }
+    return part;
+  });
+  return <div className="answer-text">{content.split(/\n{2,}/).map((block, index) => {
+    const lines = block.split("\n");
+    const heading = lines[0].match(/^#{1,4}\s+(.*)$/);
+    if (heading && lines.length === 1) return <h4 key={index}>{inline(heading[1], `${index}`)}</h4>;
+    if (lines.every((line) => /^\s*\d+[.)]\s+/.test(line))) return <ol key={index} start={Number(lines[0].match(/\d+/)?.[0] || 1)}>{lines.map((line, item) => <li key={item}>{inline(line.replace(/^\s*\d+[.)]\s+/, ""), `${index}-${item}`)}</li>)}</ol>;
+    if (heading) return <div key={index}><h4>{inline(heading[1], `${index}`)}</h4><p>{lines.slice(1).map((line, item) => <span key={item}>{item > 0 && <br />}{inline(line, `${index}-${item}`)}</span>)}</p></div>;
+    if (lines.every((line) => /^\s*[-•*]\s+/.test(line))) return <ul key={index}>{lines.map((line, item) => <li key={item}>{inline(line.replace(/^\s*[-•*]\s+/, ""), `${index}-${item}`)}</li>)}</ul>;
+    return <p key={index}>{lines.map((line, item) => <span key={item}>{item > 0 && <br />}{inline(line, `${index}-${item}`)}</span>)}</p>;
+  })}</div>;
+}
+
+// Guarda una respuesta como nota en tu biblioteca, con sus fuentes al final.
+function SaveAnswer({ message, question }: { message: ConversationMessage; question: string }) {
+  const [state, setState] = useState<"idle" | "busy" | "done" | "error">("idle");
+  const save = async () => {
+    setState("busy");
+    const titles = [...new Set(message.citations.map((citation) => citation.videoTitle || citation.label))];
+    const title = titles.length >= 2 ? `Relación: ${titles.slice(0, 3).map((item) => { const clean = item.split(/\s[|:·-]\s|[|:]/)[0].trim(); return clean.length > 36 ? `${clean.slice(0, 36).replace(/\s+\S*$/, "")}…` : clean; }).join(" × ")}` : (question || "Respuesta de LUMINA").slice(0, 90);
+    const body = message.content.replace(/\[S(\d+)[^\]]*\]/g, (_, ref) => { const index = message.citations.findIndex((citation) => citation.ref === Number(ref)); return index >= 0 ? `[${index + 1}]` : ""; });
+    const sources = message.citations.map((citation, index) => `${index + 1}. ${citation.videoTitle || citation.label}${citation.videoUrl ? ` — ${citation.videoUrl}` : ""}`).join("\n");
+    const content = `# ${title}\n\n${question ? `> ${question}\n\n` : ""}${body}${sources ? `\n\n## Fuentes\n${sources}` : ""}`;
+    try { await readJson("/api/notes", { method: "POST", body: JSON.stringify({ content }) }); setState("done"); }
+    catch { setState("error"); }
+  };
+  return <button className={`answer-save ${state}`} disabled={state === "busy" || state === "done"} onClick={() => void save()} title="Guardar esta respuesta como nota en tu biblioteca">
+    {state === "done" ? <><Check size={12} /> Guardada en tu biblioteca</> : state === "busy" ? <><LoaderCircle className="spin" size={12} /> Guardando…</> : state === "error" ? "No se pudo guardar · reintentar" : <><Bookmark size={12} /> Guardar como nota</>}
+  </button>;
 }

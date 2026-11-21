@@ -1272,9 +1272,11 @@ export function LuminaApp({ initialSurface = "home", initialConversationId = nul
     if (window.location.pathname !== "/chat") window.history.pushState({}, "", "/chat");
   };
   const relateSources = (ids: string[]) => {
-    try { window.sessionStorage.setItem("lumina-new-chat-question", ids.length === 2
-      ? "¿Cómo se relacionan estas dos fuentes? Explica qué ideas comparten, en qué se contradicen o complementan y qué conclusión nueva sale de juntarlas. Cita cada una."
-      : `¿Qué hilo conecta estas ${ids.length} fuentes? Agrúpalas por ideas en común, señala tensiones entre ellas y dime qué conclusión nueva sale de juntarlas. Cita cada una.`); } catch { /* sin almacenamiento */ }
+    try {
+      window.sessionStorage.setItem("lumina-new-chat-question", `¿Cómo se relacionan estas ${ids.length === 2 ? "dos" : ids.length} fuentes? Explica qué ideas comparten, en qué se contradicen o complementan y qué conclusión nueva sale de juntarlas. Cita cada una.`);
+      // Para relacionar fuentes conviene el modelo más capaz (Luna, de OpenAI) si está configurado.
+      if (data?.models.some((model) => model.id === "openai")) window.sessionStorage.setItem("lumina-new-chat-model", "openai");
+    } catch { /* sin almacenamiento */ }
     newChat({ collectionIds: [], tagIds: [], videoIds: ids, excludedVideoIds: [] });
   };
   const askSource = (id: string) => { setPreviewId(null); newChat({ collectionIds: [], tagIds: [], videoIds: [id], excludedVideoIds: [] }); };

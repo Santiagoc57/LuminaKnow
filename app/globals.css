@@ -3021,3 +3021,18 @@ a.share-card:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(0
 .lv-tile-selected-bar i { top: 3px; right: 6px; }
 .lv-selection-bar .relate { color: var(--accent); font-weight: 600; }
 .lv-tile.selected:hover :is(.lv-tile-art, .lv-tile-quote, .lv-tile-title, .lv-tile-quote-card, .lv-tile-palette) { transform: none; }
+
+/* Respuestas del chat: formato y citas numeradas */
+.answer-text p { margin: 0 0 12px; }
+.answer-text ul { margin: 0 0 12px; padding-left: 20px; }
+.answer-text strong { font-weight: 650; color: inherit; }
+.cite-group { white-space: nowrap; }
+.cite-num { display: inline-grid; place-items: center; min-width: 17px; height: 17px; margin: 0 1px; padding: 0 4px; border-radius: 99px; background: rgba(231,94,58,.12); color: var(--accent); font-size: 10.5px; font-weight: 700; line-height: 1; text-decoration: none; vertical-align: 2px; }
+a.cite-num:hover { background: var(--accent); color: #fff; }
+.unified-citations .cite-num { margin-right: 2px; vertical-align: 0; }
+.answer-save { margin: 2px 0 10px; height: 26px; padding: 0 10px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid #e5e0d8; border-radius: 99px; background: #fff; color: #6d655d; font: 500 11.5px/1 inherit; cursor: pointer; }
+.answer-save:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.answer-save.done { color: #3f7d4f; border-color: #cfe3d4; background: #f2f8f3; }
+.answer-text h4 { margin: 16px 0 6px; font-size: 14.5px; font-weight: 650; }
+.answer-text ol { margin: 0 0 12px; padding-left: 20px; }
+.answer-text li { margin-bottom: 6px; }
